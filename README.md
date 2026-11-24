@@ -11,15 +11,28 @@ downloads, and the four languages (English, German, French, Dutch).
 
 ## Build and run
 
-Requirements: Rust (stable), SDL2 (`libsdl2-dev`), FFmpeg dev libs (`libavcodec-dev` etc.),
-`libclang`, and a GPU/driver with Vulkan, Metal or DX12.
+```bash
+git clone https://github.com/carl0srmz/snowy && cd snowy
+./build.sh --run
+```
 
-This repository contains only the port. The original game files are an input: get a checkout of
-https://github.com/NinjaAdam/Mission-in-Snowdriftland (the `.swf` files and its `data/` folder).
+`build.sh` sets up everything and is safe to re-run (finished steps are skipped):
+
+1. installs missing system packages (compiler, pkg-config, git, libclang, SDL2, FFmpeg dev libs) with
+   `apt`, `dnf`, `pacman`, `zypper` or Homebrew (it only calls `sudo` when something is missing)
+2. installs Rust via rustup when `cargo` is missing
+3. fetches the original game files into `./original` (a read-only clone of
+   https://github.com/NinjaAdam/Mission-in-Snowdriftland; this repo contains only the port)
+4. converts the original SWFs into native assets in `./assets` (about a minute)
+5. builds the game in release mode
+
+Options: `--run` start the game afterwards, `--no-install` only check and report (never install),
+`--reconvert` redo the asset conversion, `--dry-run` print what would happen. `ORIGINAL=<dir>` uses
+an existing checkout of the original files instead of `./original`.
+
+You need a GPU/driver with Vulkan, Metal or DX12. Then, to start later:
 
 ```bash
-git clone https://github.com/NinjaAdam/Mission-in-Snowdriftland original
-ORIGINAL=original ./build.sh            # convert all SWFs -> assets/, build release binaries
 ./target/release/snowdrift --assets assets --data original
 ```
 
