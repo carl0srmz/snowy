@@ -1,0 +1,9 @@
+[package]
+name = "snow_fmt"
+version = "0.1.0"
+edition = "2021"
+description = "Native asset format for the Mission in Snowdriftland port"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+bincode = "1.3"

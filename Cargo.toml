@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = ["crates/fmt", "tools/swfx", "game"]
+
+[workspace.package]
+edition = "2021"
+
+[profile.release]
+opt-level = 3
+debug = false
+codegen-units = 16
+
+[profile.dev]
+opt-level = 1

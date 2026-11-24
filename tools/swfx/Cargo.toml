@@ -1,0 +1,16 @@
+[package]
+name = "swfx"
+version = "0.1.0"
+edition = "2021"
+description = "Converter and developer tools: turns the original Flash data into native assets"
+
+[dependencies]
+swf = "0.2"
+snow_fmt = { path = "../../crates/fmt" }
+lyon = "1"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+flate2 = "1"
+rayon = "1"
+anyhow = "1"
+regex = "1"
+puremp3 = "0.1.0"

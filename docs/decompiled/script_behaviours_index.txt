@@ -1,0 +1,351 @@
+==== script:06c00972
+function setText(txt, text, align) {
+    $r3 = com.extratoxic.utils.XMLUtil.getValueByName(_root.worldmapXML, text);
+    txt.htmlText = $r3;
+    $r2 = new TextFormat();
+    $r2.letterSpacing = 0.5;
+    txt.setTextFormat($r2);
+}
+stop();
+this._lockroot = true;
+_root.worldmapXML = worldmapXML;
+==== script:0b45e7b9
+this.type = 1;
+this.moving = true;
+this.flying = true;
+this.onEnterFrame = function () {
+    x = lx;
+    lx = this._x;
+};
+==== script:0f4a9cb6
+blinzel = random(40) + 2;
+gotoAndPlay(blinzel);
+==== script:0f60e254
+blinzel = random(70) + 3;
+gotoAndPlay(blinzel);
+==== script:12bc3ec6
+stop();
+cnt = DELAY;
+this.onEnterFrame = function () {
+    cnt = cnt - 1;
+    if (cnt == 0) {
+        gotoAndPlay("attack_left_" + (random(2) + 1));
+        delete onEnterFrame;
+    }
+};
+==== script:197caed6
+this._x = _parent._x - (random(70) + 2);
+gotoAndPlay(random(60) + 10);
+==== script:231d9748
+this._lockroot = true;
+piep1 = new com.extratoxic.audio.SoundFile(snd.createEmptyMovieClip("piep1", 1000));
+piep1.attachSound("piep1");
+piep1.setVolume(80);
+piep2 = new com.extratoxic.audio.SoundFile(snd.createEmptyMovieClip("piep2", 1001));
+piep2.attachSound("piep2");
+piep2.setVolume(80);
+piep3 = new com.extratoxic.audio.SoundFile(snd.createEmptyMovieClip("piep3", 1002));
+piep3.attachSound("piep3");
+piep3.setVolume(80);
+piep4 = new com.extratoxic.audio.SoundFile(snd.createEmptyMovieClip("piep4", 1003));
+piep4.attachSound("piep4");
+piep4.setVolume(80);
+bing = new com.extratoxic.audio.SoundFile(snd.createEmptyMovieClip("bing", 1004));
+bing.attachSound("bing");
+bing.setVolume(80);
+eyepling = new com.extratoxic.audio.SoundFile(snd.createEmptyMovieClip("eyepling", 1005));
+eyepling.attachSound("eyepling");
+eyepling.setVolume(200);
+loop1 = new com.extratoxic.audio.SoundFile(snd.createEmptyMovieClip("loop1", 2001));
+loop1.attachSound("loop1");
+loop1.setVolume(100);
+loop2 = soundLounge.getNewSoundFile("track");
+loop2.setVolume(100);
+worldmap = new com.extratoxic.audio.SoundFile(snd.createEmptyMovieClip("loop4", 2003));
+worldmap.attachSound("loop2");
+worldmap.setVolume(100);
+titletheme = new com.extratoxic.audio.SoundFile(snd.createEmptyMovieClip("title", 2004));
+titletheme.attachSound("title");
+titletheme.setVolume(100);
+==== script:25386a95
+init = true;
+_parent.stopTicker();
+_parent.text_txt.htmlText = "";
+_parent.gotoAndStop("blase");
+if ((_parent.wallpapers == undefined) || _parent.wallpapers.active) {
+    _parent.wallpapers.gotoAndStop("empty");
+}
+_parent.wallpapers.init = undefined;
+_parent.icons.init = undefined;
+stop();
+ticker_handy.start();
+==== script:255cbc33
+_parent._parent._y = -2;
+if (_global.chubbybox._x > 240) {
+    _parent._parent._x = -100;
+} else {
+    _parent._parent._x = 100;
+}
+==== script:25973afa
+stop();
+var tf = new TextFormat();
+tf.letterSpacing = 2;
+skip_txt.text = com.extratoxic.utils.XMLUtil.getValueByName(introXML, "05_buttons_02_skipintro");
+skip_txt.setTextFormat(tf);
+==== script:26d8fb7b
+stop();
+config = "data/game.xml";
+if (_level0.level == undefined) {
+    _level0.level = "level_1";
+}
+game = new Game(this, config, _level0.level);
+==== script:2b20c89e
+stop();
+speech.start();
+schwabbel.play();
+
+if (!!!(speech2 == undefined)) {
+
+    cnt = 238;
+    this.onEnterFrame = function () {
+            cnt = cnt - 1;
+            if (cnt == 0) {
+                play();
+                delete onEnterFrame;
+            }
+        };
+}
+==== script:41857009
+blinzel = random(45) + 2;
+gotoAndPlay(blinzel);
+==== script:52ffade3
+cnt = DELAY;
+stop();
+this.onEnterFrame = function () {
+    cnt = cnt - 1;
+    if (cnt == 0) {
+        gotoAndPlay("bomb_" + nextdir);
+        delete onEnterFrame;
+    }
+};
+==== script:5aa223fc
+zuck = random(45) + 3;
+gotoAndPlay(zuck);
+==== script:625d5346
+off_01_ort.text = com.extratoxic.utils.XMLUtil.getValueByName(_root.introXML, "00_off_01_ort");
+var tf = new TextFormat();
+tf.letterSpacing = 1;
+off_01_ort.setTextFormat(tf);
+==== script:6cd51260
+this._x = _parent._x - (random(70) + 2);
+gotoAndPlay(random(80) + 50);
+==== script:93854700
+cnt = DELAY;
+stop();
+this.onEnterFrame = function () {
+    cnt = cnt - 1;
+    if (cnt == 0) {
+        gotoAndPlay("attack_down_" + (random(3) + 1));
+        delete onEnterFrame;
+    }
+};
+==== script:9e7d5adb
+this.onEnterFrame = function () {
+    _parent.lasty = container._y;
+    _parent._parent.obstacle._y = container._y - 34;
+};
+==== script:9ffb38bb
+function showWorldmap() {
+    piep1.fadeOut();
+    piep2.fadeOut();
+    piep3.fadeOut();
+    piep4.fadeOut();
+    loop1.fadeOut();
+    loop2.fadeOut();
+    titletheme.fadeOut();
+    worldmap.stop();
+    worldmap.fadeIn();
+    gotoLabel("worldmap");
+}
+function setText(txt, text, align, piepNum, size, showButton) {
+    $r4 = com.extratoxic.utils.XMLUtil.getValueByName(_root.introXML, text);
+    txt.text = "";
+    txt.autoSize = true;
+    $r2 = new TextFormat();
+    $r2.letterSpacing = 2;
+    if (size == undefined) {
+        $r2.size = 20;
+    } else {
+        $r2.size = size;
+    }
+    txt.setTextFormat($r2);
+    if (showButton) {
+        $r5 = function () {
+                    _root.stage.b_weiter._visible = true;
+                };
+    } else {
+        $r5 = null;
+    }
+    $r6 = " ";
+    if (!(text === "01_office_01_off")) {
+    } else {
+        $r6 = " +++++++++++++++++++ ";
+        goto L010a;
+    }
+    _root["piep" + piepNum].setVolume(80);
+    ticker(txt, $r4, $r2, $r5, _root["piep" + piepNum]);
+}
+function ticker(txt, text, tf, onSoundComplete, speech) {
+    oef_ticker.pointer = 0;
+    oef_ticker.text = text.split("<BR />").join("\n");
+    oef_ticker.text = oef_ticker.text.split("<br />").join("\n");
+    oef_ticker.txt = txt;
+    oef_ticker.tf = tf;
+    oef_ticker.onSoundComplete = onSoundComplete;
+    oef_ticker.speech = speech;
+    oef_ticker.speechVolume = speech.getVolume();
+    speech.start(0, 99);
+    oef_ticker.onEnterFrame = function () {
+            this.pointer = this.pointer + 1;
+            $r2 = this.text.charAt(this.pointer);
+            if ($r2 == "\\") {
+                $r0 = this.pointer + 2;
+                this.pointer = $r0;
+                $r2 = this.text.charAt($r0);
+            }
+            if ($r2 == " ") {
+                this.speech.setVolume(0);
+            } else {
+                this.speech.setVolume(this.speechVolume);
+            }
+            txt.text = txt.text + $r2;
+            txt.setTextFormat(this.tf);
+            if (this.pointer == text.length) {
+                this.speech.stop();
+                this.onSoundComplete();
+                this.onEnterFrame = null;
+            }
+        };
+}
+function setDelay(sec) {
+    $r3 = _root.stage.b_weiter;
+    $r3.counter = sec * 34;
+    $r3.scene = _root.stage.szene;
+    $r3.onEnterFrame = function () {
+            $r0 = this.counter - 1;
+            this.counter = $r0;
+            if ($r0 == 0) {
+                this.scene.play();
+                this.onEnterFrame = null;
+            }
+        };
+}
+var oef_ticker = this.createEmptyMovieClip("oef_t", 99998);
+var fps = 0;
+var frame = 0;
+var ms = getTimer();
+this.onEnterFrame = function () {
+    if ((getTimer() - ms) > 1000) {
+        fps = frame;
+        frame = 0;
+        ms = getTimer();
+    } else {
+        frame = frame + 1;
+    }
+    fps_txt.text = fps;
+};
+==== script:aa062886
+stop();
+if (config == undefined) {
+    config = "data/config.xml";
+}
+control = new Control(this, config);
+==== script:aaa08d1a
+_quality = "high";
+stop();
+tuer_taf.gotoAndStop("taf");
+if (!!!(_level0._url.indexOf("http://") == -1)) {
+    cookie_button._visible = false;
+}
+==== script:cbd700e3
+output_txt.text = output_txt.text + (this + "\n");
+output_txt.text = output_txt.text + (_url + "\n");
+==== script:d3956e71
+door.gotoAndPlay("close");
+exit_button.onRollOver = function () {
+    door.gotoAndPlay("open");
+};
+exit_button.onRollOut = function () {
+    door.gotoAndPlay("close");
+};
+==== script:d3fe0179
+sperre.useHandCursor = false;
+stop();
+title_txt.text = com.extratoxic.utils.XMLUtil.getValueByName(_root.mainmapXML, "mainmap_footer_01_impressum");
+var impr = _root.impressumXML.firstChild.firstChild.firstChild.toString();
+impr = impr.split("\r\n").join("\r");
+impr = impr.split("&amp;").join("&");
+impr = impr.split("&lt;").join("<");
+impr = impr.split("&gt;").join(">");
+impr = impr.split("&quot;").join("\"");
+impressum_txt.html = true;
+impressum_txt.htmlText = impr;
+==== script:e0dd95da
+schwabbel.gotoAndPlay("talk");
+_root.setText(text_txt, "mainmap_credits_01a_schwabbel");
+stop();
+cnt = 170;
+this.onEnterFrame = function () {
+    cnt = cnt - 1;
+    if (cnt == 0) {
+        play();
+        delete this.onEnterFrame;
+    }
+};
+==== script:ef844e34
+_root.setText(text_txt, "mainmap_credits_01b_schwabbel");
+stop();
+cnt = 170;
+this.onEnterFrame = function () {
+    cnt = cnt - 1;
+    if (cnt == 0) {
+        play();
+        delete this.onEnterFrame;
+    }
+};
+==== script:f0252911
+init = true;
+_parent.stopTicker();
+_parent.text_txt.htmlText = "";
+_parent.gotoAndStop("blase");
+if ((_parent.wallpapers == undefined) || _parent.wallpapers.active) {
+    _parent.wallpapers.gotoAndStop("empty");
+}
+_parent.wallpapers.init = undefined;
+_parent.handy.init = undefined;
+ticker_icons.start();
+stop();
+==== script:f46aa506
+if (init == undefined) {
+    gotoLabel("over");
+    play();
+}
+icon.gotoAndStop(2);
+pfeile.pfeil1._visible = true;
+pfeile.pfeil2._visible = true;
+==== script:f631e737
+stop();
+cnt = DELAY;
+this.onEnterFrame = function () {
+    cnt = cnt - 1;
+    if (cnt == 0) {
+        gotoAndPlay("attack_right_" + (random(2) + 1));
+        delete onEnterFrame;
+    }
+};
+==== script:fb21b8d7
+if (_currentframe == 1) {
+    gotoFrame(1);
+} else {
+    gotoFrame(0);
+}
