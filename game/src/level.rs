@@ -119,6 +119,10 @@ struct Tile {
     xp: i32,
     yp: i32,
     clip: ClipId,
+    /// Tile.motion: the enemy's class follows its clip with the tile bounds
+    motion: bool,
+    /// Tile.dir: the enemy's direction when it was last unloaded
+    dir: Option<i32>,
 }
 
 pub struct Input {
@@ -212,6 +216,13 @@ struct Char {
     hide_cnt: i32,
     pipeline: Vec<&'static str>,
     target: (f32, f32),
+    /// linkage id of the actor's class
+    link: String,
+    /// box._x/_y: the position at the start of the last `calculate`
+    box_x: f32,
+    box_y: f32,
+    /// Eagle: (frame, container x, container y, container xscale) of the last tick
+    eagle: (u16, f32, f32, f32),
 }
 
 impl Char {
@@ -221,7 +232,7 @@ impl Char {
             jumpstage: 0, jumpcnt: 0, walks: 0, slides: 0, r_action_up: true, on_ground: false, hit_ladder: false, upon_ladder: false,
             hit_top: false, on_ladder: false, mv: 0, up: false, down: false, left: false, right: false, l_down: false, energy: 1,
             enemy, weight: 1.0, half_w: 10.0, xoff: 0.0, ytop: -30.0, ybottom: 0.0, box_scale: 1.0, pivot: 10.0, on_movable: None,
-            pause: 0, walkspeed: 0.0, depth: 0, tile: usize::MAX, alive: true, name: String::new(), kind: EK::Pinku, angry: 0, next_pause: 0, vdir: 1, changedir: 0, next_change: 0, speed: 0.0, throwcount: 100, untouchable: 0, hide_cnt: 2, pipeline: Vec::new(), target: (0.0, 0.0),
+            pause: 0, walkspeed: 0.0, depth: 0, tile: usize::MAX, alive: true, name: String::new(), kind: EK::Pinku, angry: 0, next_pause: 0, vdir: 1, changedir: 0, next_change: 0, speed: 0.0, throwcount: 100, untouchable: 0, hide_cnt: 2, pipeline: Vec::new(), target: (0.0, 0.0), link: String::new(), box_x: 0.0, box_y: 0.0, eagle: (1, 0.0, 0.0, 100.0),
         }
     }
 
@@ -319,9 +330,15 @@ pub struct Level {
     rng: u32,
     hero_frozen: bool,
     pub curtain_done: bool,
-    attack_pinku: Option<f32>,
+    /// _global.attackPinku is set (the hero's box): the next Pinku Mom chases him
+    attack_pinku: bool,
+    /// actors.Joggybear.depthcnt / actors.ElPix.depthcnt
+    joggy_depth: i32,
+    elpix_depth: i32,
     spawn_counter: i32,
     pub noclip_check: bool,
+    /// _global.complete576 for this door (every other door done with all crystals)
+    pub complete_576: bool,
 }
 
 /// Collects what scripts ask for; the game (UI or level) acts on it after the world step.
@@ -442,7 +459,7 @@ impl Level {
             let (tx, ty) = (t.x - t.w - off, t.y - t.h - off);
             let (xp, yp) = (tx + t.w + off * 2, ty + t.h + off * 2);
             let enemy = is_enemy_link(&t.link).is_some() || t.link == "iceball";
-            tiles.push(Tile { link: t.link.clone(), x: t.x, y: t.y, depth: t.depth, off: false, detached: false, enemy, tx, ty, xp, yp, clip: NONE });
+            tiles.push(Tile { link: t.link.clone(), x: t.x, y: t.y, depth: t.depth, off: false, detached: false, enemy, tx, ty, xp, yp, clip: NONE, motion: false, dir: None });
             let (c0, c1) = ((tx as f32 / SCREEN_W) as i32, (xp as f32 / SCREEN_W) as i32);
             let (r0, r1) = ((ty as f32 / SCREEN_H) as i32, (yp as f32 / SCREEN_H) as i32);
             for cx in c0.max(0)..=c1.max(0) {
@@ -515,9 +532,12 @@ impl Level {
             rng: 0x1234_5678,
             hero_frozen: false,
             curtain_done: false,
-            attack_pinku: None,
+            attack_pinku: false,
+            joggy_depth: 6000,
+            elpix_depth: 6000,
             spawn_counter: 0,
             noclip_check: std::env::var("NOCLIP_CHECK").is_ok(),
+            complete_576: false,
             data,
         };
         lv.apply_hero_pos(w);
@@ -570,8 +590,8 @@ impl Level {
                     self.tiles[i].clip = NONE;
                     continue;
                 }
-                // motion tiles (enemies) follow their clip
-                if self.tiles[i].enemy {
+                // motion tiles (enemies whose class sets Tile.motion) follow their clip
+                if self.tiles[i].enemy && self.tiles[i].motion {
                     if let Some(&e) = self.enemy_of_clip.get(&clip) {
                         let _ = e;
                     }
@@ -672,12 +692,16 @@ impl Level {
         self.spawn_enemy(clip, &link, tile);
     }
 
-    /// EnemyUtil.create: the actor object for a freshly attached enemy symbol.
+    /// EnemyUtil.create: the actor object for a freshly attached enemy symbol, with the field
+    /// defaults of its class constructor (Char sets dir = newdir = 1, the actors set newdir = -1,
+    /// so a fresh enemy turns round on its first frame exactly like the original).
     fn spawn_enemy(&mut self, clip: ClipId, link: &str, tile: usize) {
         let Some(kind) = enemy_kind(link) else { return };
         let (ws, weight) = is_enemy_link(link).unwrap_or((1.0, 0.55));
         let mut e = Char::new(clip, true);
+        e.link = link.to_string();
         e.walkspeed = ws;
+        e.speed = ws;
         e.weight = weight;
         e.kind = kind;
         e.energy = match kind {
@@ -686,8 +710,26 @@ impl Level {
             EK::ElPix => 8,
             _ => 1,
         };
+        e.dir = 1;
         e.newdir = -1;
-        e.dir = -1;
+        match link {
+            "iceball" => e.dir = -1,
+            "joggybear" => {
+                e.dir = -1;
+                e.newdir = 1;
+                e.throwcount = 1;
+            }
+            "pinkumom" => {
+                e.next_pause = 80;
+                e.angry = -1; // undefined until the first rest
+            }
+            "spider_web" => {
+                e.pause = 60;
+                e.changedir = 10;
+            }
+            "spider_run" => e.next_change = 30,
+            _ => {}
+        }
         e.tile = tile;
         e.name = if tile == usize::MAX { format!("spawn{}", self.spawn_counter) } else { format!("{}", tile + 1) };
         e.depth = if tile == usize::MAX { 6000 } else { self.tiles[tile].depth };
@@ -695,10 +737,12 @@ impl Level {
         self.enemies.push(e);
         self.enemy_of_clip.insert(clip, self.enemies.len() - 1);
     }
+
     fn detach(&mut self, w: &mut World, i: usize) {
         let clip = self.tiles[i].clip;
         if let Some(&e) = self.enemy_of_clip.get(&clip) {
             self.tiles[i].detached = false;
+            self.tiles[i].dir = Some(self.enemies[e].dir);
             self.enemies[e].alive = false;
             self.enemy_of_clip.remove(&clip);
         }
@@ -727,9 +771,38 @@ impl Level {
                 ch.pipeline = vec!["pinku", "orange", "purpu", "speedywood"];
             }
             ch.alive = true;
-            if let Some(d) = w.get_var(clip, "dir").num().is_finite().then(|| w.get_var(clip, "dir").num()) {
-                ch.newdir = d as i32;
-                ch.dir = d as i32;
+            // the initialize() of each class: where newdir / pause come from, whether the tile
+            // follows the actor (Tile.motion)
+            let link = ch.link.clone();
+            let tile = ch.tile;
+            let tile_dir = if tile < self.tiles.len() { self.tiles[tile].dir } else { None };
+            let (reads_tile_dir, reads_actor_dir, reads_actor_pause, motion) = match link.as_str() {
+                "pinku" | "orange" | "purpu" | "speedywood" | "hellscorpion" => (false, true, true, true),
+                "beycnake" | "scorpion" => (true, true, false, true),
+                "spider_run" => (true, false, true, true),
+                "speedy" | "eagle" | "elpix" => (true, false, false, false),
+                "iceball" => (false, false, false, false),
+                _ => (true, false, false, true), // pinkumom, joggybear, treeguy, stacks, spider_web, snowspider
+            };
+            let actor_dir = w.get_var(clip, "dir");
+            let actor_pause = w.get_var(clip, "pause");
+            let ch = &mut self.enemies[e];
+            if reads_tile_dir {
+                if let Some(d) = tile_dir {
+                    ch.newdir = d;
+                }
+            }
+            if reads_actor_dir && !actor_dir.is_undef() {
+                ch.newdir = actor_dir.num() as i32;
+            }
+            if reads_actor_pause && !actor_pause.is_undef() {
+                ch.pause = actor_pause.num() as i32;
+            }
+            if motion && tile < self.tiles.len() {
+                self.tiles[tile].motion = true;
+            }
+            if link == "pinkumom" {
+                self.attack_pinku = false;
             }
             return;
         }
@@ -1066,6 +1139,8 @@ impl Level {
         let mut sfx: Vec<Sfx> = Vec::new();
         {
             let c = self.ch(who);
+            c.box_x = c.x;
+            c.box_y = c.y;
             c.mv = M_STAND;
             if c.on_ground && c.r_action_up {
                 c.r_action_up = false;
@@ -1535,8 +1610,13 @@ impl Level {
                         self.sfx.push(Sfx::Player("hitEnemy"));
                     }
                     match ty {
-                        30 => self.attack_pinku = Some(self.hero.x),
-                        33 => self.hero.vy -= JUMP_FORCE / 6.0,
+                        30 => self.attack_pinku = true,
+                        33 => {
+                            // the seal bounces Chubby and plays its "hit" animation
+                            w.jump_label(parent, "hit", true, host);
+                            self.hero.vy -= JUMP_FORCE / 6.0;
+                        }
+                        34 => w.jump_label(parent, "hit", true, host),
                         35 => self.hero.vy -= JUMP_FORCE + 5.0,
                         _ => {}
                     }
@@ -1548,25 +1628,26 @@ impl Level {
                 if self.enemies[i].pause > 0 {
                     return;
                 }
-                let kind = self.enemies[i].kind;
+                let link = self.enemies[i].link.clone();
                 let my_depth = self.enemies[i].depth;
                 let other_depth = w.clip(parent).map(|c| c.depth).unwrap_or(0);
                 let other_link = w.get_var(parent, "linkId");
                 let mom = matches!(&other_link, Value::Str(s) if s == "pinkumom");
-                match kind {
-                    EK::Pinku | EK::Stack(_) => {
+                // event_hitEnemy of each class (the others have none or an empty one)
+                match link.as_str() {
+                    "pinku" | "orange" | "purpu" => {
                         if my_depth > other_depth && !mom {
                             self.enemies[i].pause = 40;
                         }
                     }
-                    EK::Speedy | EK::Web => {
+                    "speedy" | "spider_web" => {
                         if my_depth > other_depth && !mom {
                             if self.rand(2) == 1 {
                                 let e = &mut self.enemies[i];
                                 e.newdir *= -1;
                                 e.pause = 40;
                                 e.ox = 2.0 * e.newdir as f32;
-                                if kind == EK::Web {
+                                if link == "spider_web" {
                                     e.vx = 0.0;
                                     e.vy = 0.0;
                                 }
@@ -1574,13 +1655,6 @@ impl Level {
                                 self.enemies[i].pause = 40;
                             }
                         }
-                    }
-                    EK::Joggy => {
-                        let e = &mut self.enemies[i];
-                        e.newdir *= -1;
-                        e.pause = 10;
-                        e.ox = 2.0 * e.newdir as f32;
-                        e.vx = 0.0;
                     }
                     _ => {}
                 }
@@ -1663,14 +1737,18 @@ impl Level {
                         w.set_var(ob, "_yscale", Value::Num(500.0));
                         let sp = w.clip(ship).map(|c| c.parent).unwrap_or(NONE);
                         w.jump(sp, 1, false, host);
-                        self.enemies[e].kind = EK::Eagle; // inert: no more logic
-                        self.enemies[e].alive = true;
-                        // kill every other enemy
+                        // stop(); killEnemies(): every actor on the layer dies, El Pix itself
+                        // included (its container goes to the die frame; it has no "off" label)
                         for j in 0..self.enemies.len() {
                             if j != e && self.enemies[j].alive {
                                 self.enemy_die(w, host, j);
                             }
                         }
+                        self.enemies[e].alive = false;
+                        if let Some(ct) = w.child_named(tile_clip, "container") {
+                            w.jump(ct, M_DIE as u16, false, host);
+                        }
+                        w.set_var(tile_clip, "detached", Value::Bool(true));
                     }
                     _ => {}
                 }
@@ -1690,6 +1768,14 @@ impl Level {
         }
         w.jump_label(clip, "off", false, host);
         w.set_var(clip, "detached", Value::Bool(true));
+        if self.enemies[e].kind == EK::Eagle {
+            // Eagle.event_dieEffect: fall from where the flight animation was
+            let (frame, ax, ay, xs) = self.enemies[e].eagle;
+            let ct = w.path(clip, "container");
+            w.set_var(ct, "_x", Value::Num(ax as f64));
+            w.set_var(ct, "_y", Value::Num(ay as f64));
+            w.set_var(ct, "_xscale", Value::Num(if frame < 163 { -xs } else { xs } as f64));
+        }
         if tile < self.tiles.len() {
             self.tiles[tile].detached = true;
         }
@@ -1729,7 +1815,8 @@ impl Level {
                         w.set_text(t, &txt);
                     }
                     if self.crystals == 24 {
-                        self.sfx.push(Sfx::Player("energy_container"));
+                        // _global.is576(): all 24 crystals in every level -> the 576 jingle
+                        self.sfx.push(Sfx::Player(if self.complete_576 { "c_576" } else { "energy_container" }));
                         w.jump_label(self.hud_crystals, "full", true, host);
                     } else {
                         w.set_playing(self.hud_crystals, true);
@@ -1770,8 +1857,7 @@ impl Level {
                 self.outcome = Outcome::Playing;
             }
             90 => {
-                w.set_var(obstacle, "type", Value::Num(-1.0));
-                w.set_var(obstacle, "_visible", Value::Bool(false));
+                // $r4.event(): the trigger stays armed (e.g. spider_fall re-arms at "wait")
                 if let Value::Str(s) = w.get_var(parent, "event_ops") {
                     for part in s.split(',') {
                         if let Some(l) = part.strip_prefix("gotoLabel(").and_then(|p| p.strip_suffix(')')) {
@@ -1788,8 +1874,8 @@ impl Level {
     // --------------------------------------------------------------- enemies
 
     fn enemies_process(&mut self, w: &mut World, host: &mut LHost) {
-        let hero = (self.hero.x, self.hero.y);
-        let attack = self.attack_pinku.take();
+        // _global.chubbybox: the hero's collision box (its position at the start of his calculate)
+        let hero = (self.hero.box_x, self.hero.box_y);
         for i in 0..self.enemies.len() {
             if !self.enemies[i].alive || !w.alive(self.enemies[i].actor) {
                 continue;
@@ -1798,7 +1884,15 @@ impl Level {
             let kind = self.enemies[i].kind;
             let actor = self.enemies[i].actor;
             match kind {
-                EK::Eagle => continue,
+                EK::Eagle => {
+                    // Eagle.process: remembers its flight animation for event_dieEffect
+                    let ct = w.path(actor, "container");
+                    let frame = w.clip(actor).map(|c| c.frame).unwrap_or(1);
+                    let (ax, ay) = (w.get_var(ct, "_x").num() as f32, w.get_var(ct, "_y").num() as f32);
+                    let xs = w.get_var(ct, "_xscale").num() as f32;
+                    self.enemies[i].eagle = (frame, ax, ay, xs);
+                    continue;
+                }
                 EK::Joggy => {
                     self.enemies[i].throwcount -= 1;
                     if self.enemies[i].throwcount == 0 {
@@ -1820,20 +1914,22 @@ impl Level {
             self.save_states(who);
             match kind {
                 EK::Mom => {
+                    // the first Pinku Mom to run consumes _global.attackPinku
+                    let attack = std::mem::replace(&mut self.attack_pinku, false);
+                    let r = self.rand(60) as i32;
                     let e = &mut self.enemies[i];
-                    if let Some(hx) = attack {
+                    if attack {
                         if e.angry == 0 {
                             e.pause = 20;
                         }
-                        e.target = (hx, 0.0);
-                        e.newdir = if hx < e.x { -1 } else { 1 };
+                        e.newdir = if hero.0 < e.box_x { -1 } else { 1 };
                         e.angry = 200;
                         e.next_pause = 210;
                     }
                     if e.next_pause == 0 {
                         e.angry = 0;
                         e.pause = 70;
-                        e.next_pause = 100;
+                        e.next_pause = r + 100;
                     }
                 }
                 EK::Runner => {
@@ -1870,7 +1966,8 @@ impl Level {
                         if e.angry > 0 {
                             let run = if kind == EK::Mom { 5.0 } else { 12.0 };
                             e.vx = run * e.dir as f32;
-                            e.newdir = if e.target.0 < e.x + e.xoff { -1 } else { 1 };
+                            // target = the hero's box; this.box._x = own x at the last calculate
+                            e.newdir = if hero.0 < e.box_x { -1 } else { 1 };
                             if e.dir != e.newdir {
                                 e.pause = 20;
                             }
@@ -1890,10 +1987,22 @@ impl Level {
                     w.set_var(cont1, "_visible", Value::Bool(angry));
                 }
             }
+            if kind == EK::Iceball {
+                self.enemies[i].on_movable = None;
+            }
             self.calculate(who);
             self.adjust(w, host, who);
             self.position(who);
-            self.animate(w, host, who);
+            if kind != EK::Iceball {
+                // Iceball.process never calls animate()
+                self.animate(w, host, who);
+            }
+            if kind == EK::Tree {
+                // Treeguy: the obstacle turns with the art
+                let xs = w.get_var(w.path(actor, "container"), "_xscale");
+                let ob = w.path(actor, "obstacle");
+                w.set_var(ob, "_xscale", xs);
+            }
             let e = &self.enemies[i];
             if kind == EK::Iceball {
                 let inner = w.path(actor, "container.container");
@@ -1921,8 +2030,11 @@ impl Level {
         // hitColBox: overlapping a massive obstacle pushes the spider back
         let b = self.enemies[i].box_rect();
         let mut stuck = false;
-        for o in self.obstacles(w) {
-            if w.get_var(o, "type").num() as i32 == O_MASSIVE && w.get_var(o, "type").num().is_finite() {
+        // CollisionUtil.hitColBox only looks at each tile's `obstacle` child (not obstacleN)
+        let singles: Vec<ClipId> = w.clip(self.base).map(|b| b.children.values().filter_map(|&t| w.child_named(t, "obstacle")).collect()).unwrap_or_default();
+        for o in singles {
+            let t = w.get_var(o, "type");
+            if !t.is_undef() && t.num() == O_MASSIVE as f64 {
                 let ob = self.bounds(w, o);
                 if b.x0 <= ob.x1 && b.x1 >= ob.x0 && b.y0 <= ob.y1 && b.y1 >= ob.y0 {
                     stuck = true;
@@ -1980,9 +2092,13 @@ impl Level {
     fn throw_iceball(&mut self, w: &mut World, host: &mut LHost, i: usize) {
         let actor = self.enemies[i].actor;
         let (ax, ay) = (w.get_var(actor, "_x").num() as f32, w.get_var(actor, "_y").num() as f32);
-        self.spawn_counter += 1;
-        let depth = 6000 + (self.spawn_counter % 10);
-        let name = format!("iceball{}", self.spawn_counter);
+        // actors.Joggybear.depthcnt: name uses the incremented value, depth the old one
+        let depth = self.joggy_depth;
+        self.joggy_depth += 1;
+        let name = format!("iceball{}", self.joggy_depth);
+        if self.joggy_depth > 50010 {
+            self.joggy_depth = 50000;
+        }
         let Some(c) = w.attach_from(self.base, self.base_lib, "iceball", &name, depth, host) else { return };
         if let Some(cl) = w.clip_mut(c) {
             cl.m.tx = ax - 35.0;
@@ -2120,6 +2236,16 @@ impl Level {
         }
     }
 
+    /// Dev: put the hero somewhere (testing).
+    pub fn teleport_hero(&mut self, x: f32, y: f32) {
+        self.hero.x = x;
+        self.hero.y = y;
+        self.hero.lx = x;
+        self.hero.ly = y;
+        self.hero.vx = 0.0;
+        self.hero.vy = 0.0;
+    }
+
     /// One-line dump of the hero's physics state (dev tracing).
     pub fn debug_hero(&self) -> String {
         let c = &self.hero;
@@ -2167,43 +2293,55 @@ impl Level {
                 if self.enemies[e].kind != EK::ElPix {
                     return;
                 }
-                let pick = {
-                    let n = self.enemies[e].pipeline.len().max(1) as u32;
-                    self.rand(n) as usize
+                // this.pipeline.splice(random(length), 1): nothing comes out of an empty pipeline
+                // (right after the right wing broke) and attachMovie("") then fails
+                let link = if self.enemies[e].pipeline.is_empty() {
+                    None
+                } else {
+                    let n = self.enemies[e].pipeline.len() as u32;
+                    let pick = self.rand(n) as usize;
+                    Some(self.enemies[e].pipeline.remove(pick))
                 };
-                let link = if self.enemies[e].pipeline.is_empty() { "pinku" } else { self.enemies[e].pipeline.remove(pick) };
                 let ship = w.path(from, "container.container.container");
                 let (left_b, right_b) = (w.get_var(ship, "left_break").truthy(), w.get_var(ship, "right_break").truthy());
                 let ct = w.path(from, "container");
                 let (cx, cy) = (w.get_var(ct, "_x").num() as f32, w.get_var(ct, "_y").num() as f32);
-                let (mut px, mut py) = (cx + 150.0 + 160.0, cy + 210.0);
+                let mut pos: Option<(f32, f32)> = None;
                 if !right_b && (cx > 0.0 || left_b) {
-                    px = cx + 150.0 + 160.0;
+                    pos = Some((cx + 150.0 + 160.0, cy + 210.0));
                 }
                 if !left_b && cx < 0.0 {
-                    px = cx + 180.0;
+                    pos = Some((cx + 180.0, cy + 210.0));
                 }
                 if left_b && right_b {
-                    px = cx + 150.0 + 100.0;
+                    pos = Some((cx + 150.0 + 100.0, cy + 210.0));
                 }
-                py = py.max(cy + 210.0);
-                self.spawn_counter += 1;
-                let depth = 6000 + (self.spawn_counter % 10);
-                let name = format!("pinku{}", self.spawn_counter);
-                if let Some(c) = w.attach_from(self.base, self.base_lib, link, &name, depth, host) {
-                    if let Some(cl) = w.clip_mut(c) {
-                        cl.m.tx = px;
-                        cl.m.ty = py;
-                        cl.prev_m = cl.m;
-                    }
-                    if cx < 0.0 {
-                        w.set_var(c, "dir", Value::Num(1.0));
-                    }
-                    w.set_var(c, "pause", Value::Num(20.0));
-                    self.spawn_enemy(c, link, usize::MAX);
-                    let inits = std::mem::take(&mut host.inits);
-                    for k in inits {
-                        self.on_init(w, k);
+                // an undefined _x/_y in the init object is ignored: the clip stays at 0,0
+                let (px, py) = pos.unwrap_or((0.0, 0.0));
+                // actors.ElPix.depthcnt (post-increment for the depth)
+                let depth = self.elpix_depth;
+                self.elpix_depth += 1;
+                let name = format!("pinku{}", self.elpix_depth);
+                if self.elpix_depth > 50010 {
+                    self.elpix_depth = 50000;
+                }
+                if let Some(link) = link {
+                    if let Some(c) = w.attach_from(self.base, self.base_lib, link, &name, depth, host) {
+                        if let Some(cl) = w.clip_mut(c) {
+                            cl.m.tx = px;
+                            cl.m.ty = py;
+                            cl.prev_m = cl.m;
+                        }
+                        if cx < 0.0 {
+                            w.set_var(c, "dir", Value::Num(1.0));
+                        }
+                        w.set_var(c, "pause", Value::Num(20.0));
+                        self.spawn_counter += 1;
+                        self.spawn_enemy(c, link, usize::MAX);
+                        let inits = std::mem::take(&mut host.inits);
+                        for k in inits {
+                            self.on_init(w, k);
+                        }
                     }
                 }
                 if self.enemies[e].pipeline.is_empty() {

@@ -216,6 +216,11 @@ fn cmd_level(args: &[String]) -> Result<()> {
         gfx::read_target(&rd.device, &rd.queue, &target).save(path)?;
         Ok(())
     };
+    if let Ok(at) = std::env::var("HERO_AT") {
+        if let Some((x, y)) = at.split_once(',') {
+            lv.teleport_hero(x.parse()?, y.parse()?);
+        }
+    }
     for seg in script.split(',') {
         let (keys, cnt) = seg.split_once(':').unwrap_or((".", "1"));
         let cnt: u32 = cnt.parse()?;

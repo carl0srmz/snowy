@@ -695,7 +695,8 @@ impl Ui {
         let effects_name = data.effects.clone();
         let world_no = ((n.max(1) - 1) / 6 + 1).min(4);
         let level_complete = self.save.doors.get(n as usize - 1).copied().flatten().is_some();
-        let lv = Level::new(&mut self.world, screen, lvl, Some(bg), data, &mut self.host, self.save.container, world_no, level_complete)?;
+        let mut lv = Level::new(&mut self.world, screen, lvl, Some(bg), data, &mut self.host, self.save.container, world_no, level_complete)?;
+        lv.complete_576 = self.save.complete_576(Some(n as usize - 1));
         let sounds_xml = XmlValues::load(&self.paths.data().join("sounds/sounds.xml"));
         let music_swf = sounds_xml.text(&music_name);
         let music = load_bank(&self.assets, &format!("data/sounds/{}", music_swf.trim_end_matches(".swf")));
