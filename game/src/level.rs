@@ -2286,6 +2286,11 @@ impl Level {
         }
     }
 
+    /// Game.startLevel: the crystal counter is shown in every level but El Pix's (25).
+    pub fn show_crystal_counter(&self, w: &mut World, show: bool) {
+        w.set_var(self.hud_crystals, "_visible", Value::Bool(show));
+    }
+
     /// Dev: put the hero somewhere (testing).
     pub fn teleport_hero(&mut self, x: f32, y: f32) {
         self.hero.x = x;

@@ -217,6 +217,7 @@ fn cmd_level(args: &[String]) -> Result<()> {
         gfx::read_target(&rd.device, &rd.queue, &target).save(path)?;
         Ok(())
     };
+    lv.show_crystal_counter(&mut world, n != 25);
     if let Ok(at) = std::env::var("HERO_AT") {
         if let Some((x, y)) = at.split_once(',') {
             lv.teleport_hero(x.parse()?, y.parse()?);
