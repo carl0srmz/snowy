@@ -77,8 +77,11 @@ to a web server that no longer exists).
 * **CPU**: converter and bitmap decoding run on all cores (rayon); video decoding runs on its own
   thread (FFmpeg, VP6/FLV); logic runs at the original fixed 34 Hz and rendering is interpolated at
   the display refresh rate (vsync), so scrolling is smooth on 60/144 Hz screens.
-* **Audio**: SDL2 callback mixer, all sounds pre-decoded to PCM by the converter, video audio
-  decoded natively and used as the video's clock.
+* **Audio**: SDL2 callback mixer. The converter decodes every sound once (MP3 with Symphonia,
+  ADPCM natively; both checked sample-exact against FFmpeg) and trims it like Flash (MP3 encoder
+  delay skipped, exact sample count, so loops are seamless). At load time sounds are resampled
+  to the device rate with a band-limited windowed-sinc filter (multi-core), so 11/22 kHz effects
+  keep their treble. Video audio is decoded the same way and used as the video's clock.
 * **Input**: keyboard, mouse and gamepads (SDL2 game controller API).
 
 ## What the port is made of

@@ -107,29 +107,73 @@ fn adpcm(data: &[u8], channels: usize) -> Vec<i16> {
     out
 }
 
+/// Decodes a raw MP3 frame stream (Symphonia; the earlier puremp3 decoder garbled MPEG-2
+/// 22.05 kHz streams, i.e. most sound effects).
+pub fn decode_mp3(data: &[u8]) -> Result<(u32, u8, Vec<i16>)> {
+    use symphonia::core::audio::sample::Sample;
+    use symphonia::core::codecs::audio::AudioDecoderOptions;
+    use symphonia::core::errors::Error;
+    use symphonia::core::formats::probe::Hint;
+    use symphonia::core::formats::{FormatOptions, TrackType};
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+    let mss = MediaSourceStream::new(Box::new(std::io::Cursor::new(data.to_vec())), Default::default());
+    let mut hint = Hint::new();
+    hint.with_extension("mp3");
+    let mut format = symphonia::default::get_probe()
+        .probe(&hint, mss, FormatOptions::default(), MetadataOptions::default())
+        .map_err(|e| anyhow::anyhow!("mp3 probe: {e}"))?;
+    let track = format.default_track(TrackType::Audio).ok_or_else(|| anyhow::anyhow!("mp3: no track"))?;
+    let params = track.codec_params.as_ref().and_then(|p| p.audio()).ok_or_else(|| anyhow::anyhow!("mp3: no params"))?.clone();
+    let track_id = track.id;
+    let mut dec = symphonia::default::get_codecs()
+        .make_audio_decoder(&params, &AudioDecoderOptions::default())
+        .map_err(|e| anyhow::anyhow!("mp3 decoder: {e}"))?;
+    let mut rate = params.sample_rate.unwrap_or(44100);
+    let mut ch = params.channels.as_ref().map(|c| c.count() as u8).unwrap_or(1);
+    let mut pcm: Vec<i16> = Vec::new();
+    let mut buf: Vec<i16> = Vec::new();
+    loop {
+        let packet = match format.next_packet() {
+            Ok(Some(p)) => p,
+            Ok(None) => break,
+            Err(Error::IoError(_)) => break,
+            Err(e) => return Err(anyhow::anyhow!("mp3 read: {e}")),
+        };
+        if packet.track_id != track_id {
+            continue;
+        }
+        match dec.decode(&packet) {
+            Ok(ab) => {
+                rate = ab.spec().rate();
+                ch = ab.spec().channels().count() as u8;
+                buf.resize(ab.samples_interleaved(), i16::MID);
+                ab.copy_to_slice_interleaved(&mut buf);
+                pcm.extend_from_slice(&buf);
+            }
+            Err(Error::DecodeError(_)) => {}
+            Err(_) => break,
+        }
+    }
+    Ok((rate, ch, pcm))
+}
+
 pub fn extract(snd: &Sound) -> Result<(String, Vec<u8>, u32, u8)> {
     let rate = snd.format.sample_rate as u32;
     let ch = if snd.format.is_stereo { 2 } else { 1 };
     match snd.format.compression {
         AudioCompression::Mp3 => {
-            // first two bytes are the encoder delay in samples; decode to PCM so the game
-            // only ever reads WAV (no decoding at load time).
+            // MP3SOUNDDATA: SeekSamples (SI16) then MP3 frames. Like Flash, skip the SeekSamples
+            // (encoder delay) and keep exactly `num_samples` sample frames.
+            let seek = snd.data.get(0..2).map(|b| i16::from_le_bytes([b[0], b[1]]).max(0) as usize).unwrap_or(0);
             let d = snd.data.get(2..).unwrap_or(&[]);
-            let mut dec = puremp3::Mp3Decoder::new(d);
-            let mut pcm: Vec<i16> = Vec::new();
-            let (mut out_rate, mut out_ch) = (rate, ch);
-            while let Ok(f) = dec.next_frame() {
-                out_rate = f.header.sample_rate.hz();
-                out_ch = if matches!(f.header.channels, puremp3::Channels::Mono) { 1 } else { 2 };
-                for i in 0..f.num_samples {
-                    let l = (f.samples[0][i].clamp(-1.0, 1.0) * 32767.0) as i16;
-                    pcm.push(l);
-                    if out_ch == 2 {
-                        pcm.push((f.samples[1][i].clamp(-1.0, 1.0) * 32767.0) as i16);
-                    }
-                }
-            }
-            Ok((format!("{}.wav", snd.id), wav(out_rate, out_ch, &pcm), out_rate, out_ch))
+            let (out_rate, out_ch, pcm) = decode_mp3(d)?;
+            let c = out_ch as usize;
+            let start = (seek * c).min(pcm.len());
+            let want = snd.num_samples as usize * c;
+            let end = if want > 0 { (start + want).min(pcm.len()) } else { pcm.len() };
+            let pcm = &pcm[start..end];
+            Ok((format!("{}.wav", snd.id), wav(out_rate, out_ch, pcm), out_rate, out_ch))
         }
         AudioCompression::Uncompressed | AudioCompression::UncompressedUnknownEndian => {
             let pcm: Vec<i16> = if snd.format.is_16_bit {
@@ -140,7 +184,8 @@ pub fn extract(snd: &Sound) -> Result<(String, Vec<u8>, u32, u8)> {
             Ok((format!("{}.wav", snd.id), wav(rate, ch, &pcm), rate, ch))
         }
         AudioCompression::Adpcm => {
-            let pcm = adpcm(snd.data, ch as usize);
+            let mut pcm = adpcm(snd.data, ch as usize);
+            pcm.truncate((snd.num_samples as usize * ch as usize).max(1));
             Ok((format!("{}.wav", snd.id), wav(rate, ch, &pcm), rate, ch))
         }
         other => bail!("unsupported sound compression {:?}", other),

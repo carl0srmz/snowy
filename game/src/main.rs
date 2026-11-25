@@ -370,6 +370,13 @@ fn main() -> Result<()> {
         Some("level") => cmd_level(&args[1..]),
         Some("ui") => cmd_ui(&args[1..]),
         Some("video") => cmd_video(&args[1..]),
+        Some("adec") => {
+            // dev: dump a video's decoded audio as f32le stereo
+            let (rate, s) = video::decode_audio(std::path::Path::new(&args[1])).ok_or_else(|| anyhow::anyhow!("no audio"))?;
+            std::fs::write(&args[2], s.iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<u8>>())?;
+            println!("rate {rate} frames {}", s.len() / 2);
+            Ok(())
+        }
         _ => {
             let mut opt = app::Options { assets: PathBuf::from("assets"), repo: PathBuf::from("original"), level: None, fullscreen: false, mute: false, max_seconds: None, lang: texts::Lang::detect(), debug: false, unlock_all: false };
             let mut i = 0;

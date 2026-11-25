@@ -158,12 +158,6 @@ checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
 
 [[package]]
 name = "bitstream-io"
-version = "0.8.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "614aa3f2bac03707e62a84d18a48dd3d9ea6171313fd5e6a53b5054d8ae74601"
-
-[[package]]
-name = "bitstream-io"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6099cdc01846bc367c4e7dd630dc5966dccf36b652fae7a74e17b640411a91b2"
@@ -1243,16 +1237,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 
 [[package]]
-name = "puremp3"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2b7efbb39e373af70c139e0611375fa6cad751fb93d528a610b55302710d883"
-dependencies = [
- "bitstream-io 0.8.5",
- "byteorder",
-]
-
-[[package]]
 name = "pxfm"
 version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1527,7 +1511,6 @@ dependencies = [
  "image",
  "log",
  "pollster",
- "puremp3",
  "raw-window-handle",
  "rayon",
  "roxmltree",
@@ -1561,7 +1544,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "802bff556571f7e5c6e347d5f147f91d1e5976bb43fb312437f04676707bbe4f"
 dependencies = [
  "bitflags",
- "bitstream-io 2.6.0",
+ "bitstream-io",
  "byteorder",
  "encoding_rs",
  "enum-map",
@@ -1581,11 +1564,11 @@ dependencies = [
  "flate2",
  "image",
  "lyon",
- "puremp3",
  "rayon",
  "regex",
  "snow_fmt",
  "swf",
+ "symphonia",
 ]
 
 [[package]]

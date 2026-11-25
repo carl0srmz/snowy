@@ -1051,9 +1051,16 @@ impl Ui {
         let (player, effects, music) = (g.player.clone(), g.effects.clone(), g.music.clone());
         let number = g.number;
         let mv = self.musicvol / 100.0;
-        let tick_len = |bank: &Bank, name: &str| -> i32 {
-            bank.files.get(name).and_then(|p| std::fs::metadata(p).ok()).map(|m| (((m.len() as f32 - 44.0) / 2.0) / 44100.0 * TICK_HZ) as i32 + 4).unwrap_or(100).max(30)
-        };
+        // length of a sound in ticks (its real decoded duration, whatever its sample rate)
+        let rate = self.audio.rate;
+        let lens: Vec<(String, i32)> = ["gameover", "finish", "finish_elpix"]
+            .iter()
+            .map(|n| {
+                let t = player.files.get(*n).cloned().and_then(|p| self.audio.load(&p).ok()).map(|pcm| (pcm.seconds(rate) * TICK_HZ) as i32 + 4).unwrap_or(100).max(30);
+                (n.to_string(), t)
+            })
+            .collect();
+        let tick_len = |_: &Bank, name: &str| -> i32 { lens.iter().find(|l| l.0 == name).map(|l| l.1).unwrap_or(100) };
         match fx {
             Sfx::Player(n) => {
                 if n == "steps" {

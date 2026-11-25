@@ -36,7 +36,7 @@ fn open_info(path: &Path) -> Option<(u32, u32, f32)> {
 }
 
 /// Decodes the MP3 audio track (FLV audio packets are raw MPEG frames) to stereo float PCM.
-fn decode_audio(path: &Path) -> Option<(u32, Vec<f32>)> {
+pub fn decode_audio(path: &Path) -> Option<(u32, Vec<f32>)> {
     let mut ictx = ff::format::input(&path).ok()?;
     let ai = ictx.streams().best(ff::media::Type::Audio)?.index();
     let mut data = Vec::new();
@@ -47,14 +47,50 @@ fn decode_audio(path: &Path) -> Option<(u32, Vec<f32>)> {
             }
         }
     }
-    let mut dec = puremp3::Mp3Decoder::new(&data[..]);
+    decode_mp3_stereo(data)
+}
+
+/// Raw MPEG audio frames -> (rate, interleaved stereo f32), with Symphonia.
+fn decode_mp3_stereo(data: Vec<u8>) -> Option<(u32, Vec<f32>)> {
+    use symphonia::core::audio::sample::Sample;
+    use symphonia::core::codecs::audio::AudioDecoderOptions;
+    use symphonia::core::errors::Error;
+    use symphonia::core::formats::probe::Hint;
+    use symphonia::core::formats::{FormatOptions, TrackType};
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+    let mss = MediaSourceStream::new(Box::new(std::io::Cursor::new(data)), Default::default());
+    let mut hint = Hint::new();
+    hint.with_extension("mp3");
+    let mut format = symphonia::default::get_probe().probe(&hint, mss, FormatOptions::default(), MetadataOptions::default()).ok()?;
+    let track = format.default_track(TrackType::Audio)?;
+    let params = track.codec_params.as_ref()?.audio()?.clone();
+    let track_id = track.id;
+    let mut dec = symphonia::default::get_codecs().make_audio_decoder(&params, &AudioDecoderOptions::default()).ok()?;
+    let mut rate = params.sample_rate.unwrap_or(44100);
     let mut out = Vec::new();
-    let mut rate = 44100;
-    while let Ok(f) = dec.next_frame() {
-        rate = f.header.sample_rate.hz();
-        for i in 0..f.num_samples {
-            out.push(f.samples[0][i]);
-            out.push(f.samples[1][i]);
+    let mut buf: Vec<f32> = Vec::new();
+    loop {
+        let packet = match format.next_packet() {
+            Ok(Some(p)) => p,
+            _ => break,
+        };
+        if packet.track_id != track_id {
+            continue;
+        }
+        match dec.decode(&packet) {
+            Ok(ab) => {
+                rate = ab.spec().rate();
+                let ch = ab.spec().channels().count().max(1);
+                buf.resize(ab.samples_interleaved(), f32::MID);
+                ab.copy_to_slice_interleaved(&mut buf);
+                for fr in buf.chunks_exact(ch) {
+                    out.push(fr[0]);
+                    out.push(if ch > 1 { fr[1] } else { fr[0] });
+                }
+            }
+            Err(Error::DecodeError(_)) => {}
+            Err(_) => break,
         }
     }
     Some((rate, out))

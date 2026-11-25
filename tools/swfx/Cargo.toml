@@ -13,4 +13,4 @@ flate2 = "1"
 rayon = "1"
 anyhow = "1"
 regex = "1"
-puremp3 = "0.1.0"
+symphonia = { version = "0.6.1", default-features = false, features = ["mp3"] }
