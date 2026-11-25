@@ -44,6 +44,26 @@ struct Dec<'a> {
     loops: HashMap<usize, usize>, // start idx -> end idx (the backward branch)
     out: String,
     failed: bool,
+    tmp: usize,
+}
+
+/// Does expression `e` read `target` (as a whole identifier / member chain)?
+fn refers_to(e: &str, target: &str) -> bool {
+    if target.is_empty() {
+        return false;
+    }
+    let ok = |c: Option<char>| !matches!(c, Some(c) if c.is_alphanumeric() || c == '_' || c == '$');
+    let mut from = 0;
+    while let Some(k) = e[from..].find(target) {
+        let at = from + k;
+        let before = e[..at].chars().next_back();
+        let after = e[at + target.len()..].chars().next();
+        if ok(after) && (ok(before) || target.starts_with("this.")) && before != Some('.') {
+            return true;
+        }
+        from = at + target.len();
+    }
+    false
 }
 
 fn is_ident(x: &str) -> bool {
@@ -107,6 +127,20 @@ fn prop_name(i: i64) -> &'static str {
     .unwrap_or("_prop?")
 }
 
+thread_local! {
+    /// Post-increment spilling (see `spill`). The converter turns it off so the texts it hashes
+    /// into `script:<id>` names stay identical to the ones the game's native handlers are keyed on.
+    static SPILL: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
+}
+
+/// Decompiles exactly as the first converter did (no post-increment spilling), for stable script ids.
+pub fn decompile_tag_legacy(data: &[u8], version: u8) -> String {
+    let prev = SPILL.with(|x| x.replace(false));
+    let t = decompile_tag(data, version, &[], HashMap::new(), 0);
+    SPILL.with(|x| x.set(prev));
+    t
+}
+
 pub fn decompile_tag(data: &[u8], version: u8, pool: &[String], regs: HashMap<u8, String>, ind: usize) -> String {
     let mut d = Dec::new(data, version, pool.to_vec(), regs);
     let mut st = Vec::new();
@@ -134,7 +168,7 @@ impl<'a> Dec<'a> {
             }
         }
         let idx_of = ins.iter().enumerate().map(|(i, x)| (x.pos, i)).collect();
-        let mut d = Dec { ins, idx_of, pool, regs, version, loops: HashMap::new(), out: String::new(), failed: false };
+        let mut d = Dec { ins, idx_of, pool, regs, version, loops: HashMap::new(), out: String::new(), failed: false, tmp: 0 };
         d.find_loops();
         d
     }
@@ -174,6 +208,23 @@ impl<'a> Dec<'a> {
             None => {
                 self.failed = true;
                 Ex::simple("<stack?>")
+            }
+        }
+    }
+
+    /// Before `target` is assigned, values still on the stack that read it must keep the
+    /// old value (e.g. `if (x++ > y)` pushes `x`, then stores `x + 1`): spill them into temps.
+    fn spill(&mut self, st: &mut Vec<Ex>, target: &str, ind: usize) {
+        if !SPILL.with(|x| x.get()) {
+            return;
+        }
+        for i in 0..st.len() {
+            if refers_to(&st[i].s, target) {
+                self.tmp += 1;
+                let t = format!("$old{}", self.tmp);
+                let line = format!("var {} = {};", t, strip(&st[i].s));
+                self.line(ind, &line);
+                st[i] = Ex::simple(t);
             }
         }
     }
@@ -317,6 +368,7 @@ impl<'a> Dec<'a> {
                     let name = self.regs.get(&r.register).cloned().unwrap_or_else(|| format!("$r{}", r.register));
                     self.regs.entry(r.register).or_insert_with(|| name.clone());
                     if top.s != name {
+                        self.spill(st, &name, ind);
                         self.line(ind, &format!("{} = {};", name, strip(&top.s)));
                     }
                     st.push(Ex::simple(name));
@@ -332,6 +384,7 @@ impl<'a> Dec<'a> {
                     let v = self.pop(st);
                     let n = self.pop(st);
                     let l = n.lit.clone().unwrap_or_else(|| format!("eval({})", n.s));
+                    self.spill(st, &l, ind);
                     self.line(ind, &format!("{} = {};", l, strip(&v.s)));
                 }
                 Action::DefineLocal => {
@@ -356,6 +409,7 @@ impl<'a> Dec<'a> {
                     let n = self.pop(st);
                     let o = self.pop(st);
                     let m = self.member(&o, &n);
+                    self.spill(st, &m, ind);
                     self.line(ind, &format!("{} = {};", m, strip(&v.s)));
                 }
                 Action::GetProperty => {

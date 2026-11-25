@@ -5,11 +5,10 @@
 //! `Behavior` (implemented natively in the game) or as `Unknown` for diagnostics.
 use regex::Regex;
 use snow_fmt::{Op, Val};
-use std::collections::HashMap;
 use std::sync::OnceLock;
 
 pub fn lower(data: &[u8], version: u8) -> Vec<Op> {
-    let text = crate::decomp::decompile_tag(data, version, &[], HashMap::new(), 0);
+    let text = crate::decomp::decompile_tag_legacy(data, version);
     lower_text(&text)
 }
 
@@ -165,7 +164,24 @@ pub fn lower_text(text: &str) -> Vec<Op> {
 
     let r = res();
     let mut unknown = false;
+    // Only top-level statements run when the frame does: the bodies of function definitions,
+    // closures (`x.onEnterFrame = function () {...}`) and if/else/loops are left to the native
+    // handler of the script (they used to be lowered unconditionally, which ran e.g. the intro's
+    // `showWorldmap()` body on its first frame).
+    let legacy = std::env::var("SWFX_LEGACY_LOWER").is_ok();
+    let mut depth = 0i32;
     for line in t.lines() {
+        let l = line.trim();
+        let opens = l.matches('{').count() as i32;
+        let closes = l.matches('}').count() as i32;
+        let nested = depth > 0;
+        depth += opens - closes;
+        if !legacy && (nested || opens > 0 || closes > 0) {
+            if !l.is_empty() {
+                unknown = true;
+            }
+            continue;
+        }
         let l = line.trim();
         if l.is_empty() {
             continue;

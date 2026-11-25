@@ -450,8 +450,9 @@ if (!_global.com.extratoxic.utils.LoadStack) {
                 this.push(arguments[$r4]);
                 $r4 = $r4 + 1;
             }
+            var $old1 = com.extratoxic.utils.LoadStack.idcnt;
             com.extratoxic.utils.LoadStack.idcnt = com.extratoxic.utils.LoadStack.idcnt + 1;
-            this.id = com.extratoxic.utils.LoadStack.idcnt;
+            this.id = $old1;
             $r4 = 0;
             while ($r4 < this.length) {
                 $r4 = $r4 + 1;
@@ -482,8 +483,9 @@ if (!_global.com.extratoxic.utils.LoadStack) {
             }
             this.loading = true;
             if (this.pointer < this.length) {
+                var $old2 = this.pointer;
                 this.pointer = this.pointer + 1;
-                this.currentLoader = this[this.pointer];
+                this.currentLoader = this[$old2];
                 this.currentLoader.addListener(this);
                 this.currentLoader.load();
             } else {
@@ -597,8 +599,9 @@ if (!_global.com.extratoxic.utils.Loader) {
                     this.container.loaded = true;
                 }
                 if (($r3 == $r2) && this.container.loaded) {
+                    var $old1 = this.delay;
                     this.delay = this.delay - 1;
-                    if (this.delay > 0) {
+                    if ($old1 > 0) {
                         return;
                     }
                     this.isLoaded = true;
@@ -1197,8 +1200,9 @@ if (!_global.utils.Ticker) {
             com.extratoxic.events.Run.detach(this);
         };
     $r2.process = function () {
+            var $old1 = this.pointer;
             this.pointer = this.pointer + 1;
-            $r2 = this.text.charAt(this.pointer);
+            $r2 = this.text.charAt($old1);
             if ($r2 == "\\") {
                 $r0 = this.pointer + 2;
                 this.pointer = $r0;
@@ -1721,8 +1725,9 @@ if (!_global.com.extratoxic.audio.SoundFile) {
                 this.start(0, 999);
             }
             this.movie.onEnterFrame = function () {
+                        var $old1 = this.counter;
                         this.counter = this.counter - 1;
-                        if (this.counter == 0) {
+                        if ($old1 == 0) {
                             this.volume = this.volume + (this.mod * 2);
                             this.snd.setVolume(this.volume);
                             if ((!(this.volume > 0) && (this.mod == -1)) || (!(this.volume < this.endVolume) && (this.mod == 1))) {
@@ -1791,8 +1796,9 @@ if (!_global.com.extratoxic.audio.SoundPackage) {
                 this.movie = parent.soundPackages;
             }
             $r0 = com.extratoxic.audio.SoundPackage.packageId + 1;
+            var $old1 = com.extratoxic.audio.SoundPackage.packageId;
             com.extratoxic.audio.SoundPackage.packageId = $r0;
-            this.child = this.movie.createEmptyMovieClip("package" + $r0, com.extratoxic.audio.SoundPackage.packageId);
+            this.child = this.movie.createEmptyMovieClip("package" + $r0, $old1);
         };
     com.extratoxic.audio.SoundPackage = $r1;
     $r2 = $r1.prototype;

@@ -422,8 +422,9 @@ _root.worldmapXML = worldmapXML;
     stop();
     cnt = 170;
     this.onEnterFrame = function () {
+            var $old1 = cnt;
             cnt = cnt - 1;
-            if (cnt == 0) {
+            if ($old1 == 0) {
                 play();
                 delete this.onEnterFrame;
             }
@@ -433,8 +434,9 @@ _root.worldmapXML = worldmapXML;
     stop();
     cnt = 170;
     this.onEnterFrame = function () {
+            var $old1 = cnt;
             cnt = cnt - 1;
-            if (cnt == 0) {
+            if ($old1 == 0) {
                 play();
                 delete this.onEnterFrame;
             }

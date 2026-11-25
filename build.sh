@@ -176,11 +176,15 @@ say "building (release)"
 run cargo build --release
 BIN="${CARGO_TARGET_DIR:-target}/release"
 
-if [ "$RECONVERT" = 1 ] || [ ! -f assets/scripts_index.txt ]; then
+# the assets depend on the converter: redo them whenever its source changed
+STAMP="$(cat tools/swfx/src/*.rs crates/fmt/src/*.rs | cksum | cut -d' ' -f1)"
+if [ "$RECONVERT" = 1 ] || [ ! -f assets/scripts_index.txt ] || [ "$(cat assets/.converter 2>/dev/null)" != "$STAMP" ]; then
   say "converting the original Flash data into native assets (about 1 minute on many cores)"
+  run rm -rf assets
   run "$BIN/swfx" convert "$ORIGINAL" assets
+  [ "$DRY" = 1 ] || echo "$STAMP" > assets/.converter
 else
-  echo "assets/ already converted (use --reconvert to redo)"
+  echo "assets/ are up to date (use --reconvert to redo)"
 fi
 
 say "done"

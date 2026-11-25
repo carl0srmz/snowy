@@ -223,6 +223,9 @@ fn cmd_level(args: &[String]) -> Result<()> {
         for _ in 0..cnt {
             let out = lv.tick(&mut world, &mut host, &inp);
             t += 1;
+            if std::env::var("TRACE").is_ok() {
+                println!("{:4} {} {}", t, keys, lv.debug_hero());
+            }
             if every > 0 && t % every == 0 {
                 let p = shot.with_file_name(format!("{}_{:04}.png", shot.file_stem().unwrap().to_string_lossy(), t));
                 render(&world, &mut rd, &p)?;
@@ -317,8 +320,12 @@ fn cmd_ui(args: &[String]) -> Result<()> {
                 ui.world.set_var(c, "_visible", movie::Value::Bool(cmd == "show"));
             }
             "tree" => {
-                let c = ui.clip(arg);
-                walk_tree(&ui.world, c, 0, 3);
+                // "/path" is relative to the stage root (layers), otherwise to the main movie
+                let c = match arg.strip_prefix('/') {
+                    Some(p) => { let r = ui.world.root; if p.is_empty() { r } else { ui.world.path(r, p) } }
+                    None => ui.clip(arg),
+                };
+                walk_tree(&ui.world, c, 0, std::env::var("TREE_DEPTH").ok().and_then(|d| d.parse().ok()).unwrap_or(3));
             }
             "hit" => {
                 let (x, y) = arg.split_once(',').unwrap();

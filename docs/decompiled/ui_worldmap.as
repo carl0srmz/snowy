@@ -58,8 +58,9 @@ if (!!!(_level0._url.indexOf("http://") == -1)) {
         trace("FOUND " + speech2);
         cnt = 238;
         this.onEnterFrame = function () {
+                    var $old1 = cnt;
                     cnt = cnt - 1;
-                    if (cnt == 0) {
+                    if ($old1 == 0) {
                         play();
                         delete onEnterFrame;
                     }
@@ -3652,8 +3653,9 @@ if (!_global.mx.managers.DepthManager) {
                 $r5 = $r2;
                 $r2 = this.findNextAvailableDepth($r2, $r3, $r6);
             }
+            var $old1 = this._childCounter;
             this._childCounter = this._childCounter + 1;
-            $r4 = this.createClassObject(className, "depthChild" + this._childCounter, $r2, initObj);
+            $r4 = this.createClassObject(className, "depthChild" + $old1, $r2, initObj);
             if (!!!($r5 == undefined)) {
                 $r3[$r2] = $r4;
                 this.shuffleDepths($r4, $r5, $r3, $r6);
@@ -3678,8 +3680,9 @@ if (!_global.mx.managers.DepthManager) {
                 $r5 = $r2;
                 $r2 = this.findNextAvailableDepth($r2, $r3, $r6);
             }
+            var $old1 = this._childCounter;
             this._childCounter = this._childCounter + 1;
-            $r4 = this.createObject(linkageName, "depthChild" + this._childCounter, $r2, initObj);
+            $r4 = this.createObject(linkageName, "depthChild" + $old1, $r2, initObj);
             if (!!!($r5 == undefined)) {
                 $r3[$r2] = $r4;
                 this.shuffleDepths($r4, $r5, $r3, $r6);
@@ -4642,8 +4645,9 @@ if (!_global.mx.managers.FocusManager) {
                 mx.managers.FocusManager.initialized = true;
                 Object.registerClass("FocusManager", mx.managers.FocusManager);
                 if (_root.focusManager == undefined) {
+                    var $old1 = mx.managers.DepthManager.highestDepth;
                     mx.managers.DepthManager.highestDepth = mx.managers.DepthManager.highestDepth - 1;
-                    _root.createClassObject(mx.managers.FocusManager, "focusManager", mx.managers.DepthManager.highestDepth);
+                    _root.createClassObject(mx.managers.FocusManager, "focusManager", $old1);
                 }
             }
         };
@@ -5954,8 +5958,9 @@ Object.registerClass("UIObject", mx.core.UIObject);
 // ======== DoInitAction sprite=208 
 Object.registerClass("FocusManager", mx.managers.FocusManager);
 if (_root.focusManager == undefined) {
+    var $old1 = mx.managers.DepthManager.highestDepth;
     mx.managers.DepthManager.highestDepth = mx.managers.DepthManager.highestDepth - 1;
-    _root.createClassObject(mx.managers.FocusManager, "focusManager", mx.managers.DepthManager.highestDepth);
+    _root.createClassObject(mx.managers.FocusManager, "focusManager", $old1);
 }
 // ======== DoInitAction sprite=209 FocusRect
 Object.registerClass("FocusRect", mx.skins.halo.FocusRect);

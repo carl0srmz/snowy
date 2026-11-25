@@ -10,6 +10,14 @@ fn dis_actions(indent: &str, data: &[u8], version: u8) {
                 println!("{indent}{pos:05x}: <end>");
                 break;
             }
+            Ok(swf::avm1::types::Action::DefineFunction2(f)) => {
+                println!("{indent}{pos:05x}: DefineFunction2 name={:?} params={:?} regs={}", s(f.name), f.params.iter().map(|p| (s(p.name), p.register_index)).collect::<Vec<_>>(), f.register_count);
+                dis_actions(&format!("{indent}    "), f.actions, version);
+            }
+            Ok(swf::avm1::types::Action::DefineFunction(f)) => {
+                println!("{indent}{pos:05x}: DefineFunction name={:?} params={:?}", s(f.name), f.params.iter().map(|p| s(p)).collect::<Vec<_>>());
+                dis_actions(&format!("{indent}    "), f.actions, version);
+            }
             Ok(a) => println!("{indent}{pos:05x}: {a:?}"),
             Err(e) => {
                 println!("{indent}!! error {e:?}");

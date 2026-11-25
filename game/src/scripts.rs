@@ -29,6 +29,8 @@ pub struct Wait {
     pub owner: ClipId,
     pub ticks: i32,
     pub action: WaitAction,
+    /// created during this tick's dispatch: its first enterFrame is next tick
+    pub fresh: bool,
 }
 
 fn s_of(v: &Value) -> String {
@@ -161,6 +163,7 @@ impl Ui {
             _ => return,
         };
         let playing = voice.map(|v| self.audio.is_playing(v)).unwrap_or(false);
+        log::debug!(target: "snd", "tick {} {}.{}({:?}) sound={} vol={} playing={}", self.tick_no, key.1, method, args, sname, vol, playing);
         let mut new_voice = voice;
         let mut new_vol = vol;
         match method {
@@ -192,7 +195,8 @@ impl Ui {
                 new_voice = None;
             }
             "fadeIn" => {
-                let delay = args.first().map(|v| v.num() as f32).unwrap_or(1.0).max(1.0);
+                // SoundFile.fade(1, delay): +2 volume every (delay + 1) frames
+                let delay = args.first().map(|v| v.num() as f32).filter(|d| d.is_finite()).unwrap_or(0.0).max(0.0) + 1.0;
                 let target = if new_vol <= 0.0 { 100.0 } else { new_vol };
                 if let Some(v) = voice {
                     self.audio.stop(v);
@@ -204,7 +208,8 @@ impl Ui {
                 new_vol = target;
             }
             "fadeOut" => {
-                let delay = args.first().map(|v| v.num() as f32).unwrap_or(1.0).max(1.0);
+                // SoundFile.fade(-1, delay): -2 volume every (delay + 1) frames
+                let delay = args.first().map(|v| v.num() as f32).filter(|d| d.is_finite()).unwrap_or(0.0).max(0.0) + 1.0;
                 if playing {
                     if let Some(v) = voice {
                         self.audio.fade_to(v, 0.0, (new_vol / 2.0).max(1.0) * delay / TICK_HZ, true);
@@ -242,6 +247,11 @@ impl Ui {
                 continue;
             }
             if !self.world.alive(w.clip) {
+                continue;
+            }
+            if w.fresh {
+                w.fresh = false;
+                keep.push(w);
                 continue;
             }
             w.ticks -= 1;
@@ -303,9 +313,11 @@ impl Ui {
         self.followers.extend(keep);
     }
 
+    /// `cnt = ticks; onEnterFrame = function () { if (cnt-- == 0) action; }` of the original:
+    /// the action runs on the (ticks + 1)th enterFrame after the frame that set it up.
     fn wait(&mut self, clip: ClipId, ticks: i32, action: WaitAction) {
         self.world.set_playing(clip, false);
-        self.waits.push(Wait { clip, owner: clip, ticks, action });
+        self.waits.push(Wait { clip, owner: clip, ticks: ticks + 1, action, fresh: true });
     }
 
     // --------------------------------------------------------- behaviours

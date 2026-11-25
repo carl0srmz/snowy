@@ -98,6 +98,8 @@ pub struct Clip {
     pub playing: bool,
     /// depths placed by the timeline (the rest were attached by game code)
     pub tl_depths: HashSet<i32>,
+    /// timeline frame of the parent that placed this instance (0 = created by script)
+    pub place_frame: u16,
     pub vars: HashMap<String, Value>,
     pub events: Vec<ClipEvent>,
     pub born: u64,
@@ -137,6 +139,12 @@ pub struct World {
     pub globals: HashMap<String, Value>,
     pub tick: u64,
     instance_counter: u32,
+    /// clips whose frame is being entered right now (their own gotos are applied by that loop)
+    entering: Vec<ClipId>,
+    /// gotos on clips that are not entering a frame: applied right after the op that issued them
+    queued_gotos: Vec<(ClipId, u16, bool)>,
+    /// frame whose commands `apply_cmds` is placing (stamped on new instances)
+    placing_frame: u16,
     pub sound_events: Vec<SoundEvent>,
     pub pending_removals: Vec<ClipId>,
     /// clips whose script cleared `onEnterFrame` (cancels pending delayed actions)
@@ -158,6 +166,9 @@ impl World {
             globals: HashMap::new(),
             tick: 0,
             instance_counter: 0,
+            entering: Vec::new(),
+            queued_gotos: Vec::new(),
+            placing_frame: 0,
             sound_events: Vec::new(),
             pending_removals: Vec::new(),
             cancelled_enter: Vec::new(),
@@ -539,6 +550,9 @@ impl World {
                 Op::Behavior(name) => self.behavior(id, name, host),
                 Op::Unknown(_) => {}
             }
+            if !self.queued_gotos.is_empty() {
+                self.flush_gotos(host);
+            }
         }
     }
 
@@ -699,37 +713,180 @@ impl World {
         }
     }
 
-    /// Requests a jump; applied by the frame loop so the current script finishes first.
+    /// `gotoAndPlay/gotoAndStop`. On a clip that is entering a frame (its own frame script) the
+    /// jump is applied by that frame loop once the script finishes; on any other clip the playhead
+    /// moves right after the current action, as in Flash (a stopped clip jumps too).
     pub fn goto_frame(&mut self, id: ClipId, frame: u16, play: bool) {
+        let entering = self.entering.contains(&id);
         if let Some(c) = self.clip_mut(id) {
             let f = frame.clamp(1, c.total.max(1));
-            c.pending_goto = Some((f, play));
+            if entering {
+                c.pending_goto = Some((f, play));
+            } else {
+                self.queued_gotos.push((id, f, play));
+            }
         }
     }
 
-    fn rebuild_to(&mut self, id: ClipId, frame: u16, host: &mut dyn Host) {
-        // going backwards: drop timeline-placed children and replay from frame 1
-        let (lib, cid, cur) = {
-            let c = self.clip(id).unwrap();
-            (c.lib, c.cid, c.frame)
-        };
-        let _ = cur;
-        let depths: Vec<i32> = self.clip(id).unwrap().tl_depths.iter().copied().collect();
-        for d in depths {
-            if let Some(ch) = self.clip(id).and_then(|c| c.children.get(&d).copied()) {
-                self.remove(ch);
+    /// Applies gotos queued by `goto_frame` (see there).
+    pub fn flush_gotos(&mut self, host: &mut dyn Host) {
+        let mut guard = 0;
+        while !self.queued_gotos.is_empty() && guard < 256 {
+            guard += 1;
+            let list = std::mem::take(&mut self.queued_gotos);
+            for (id, f, play) in list {
+                self.jump(id, f, play, host);
             }
         }
-        if let Some(c) = self.clip_mut(id) {
-            c.tl_depths.clear();
-        }
+    }
+
+    /// Going backwards (or looping): Flash/Ruffle goto semantics. Children placed after `frame`
+    /// are removed; for every depth the commands of frames 1..=frame are merged into one final
+    /// placement; an existing instance of the same character is kept (only its properties change,
+    /// so nested animations keep running), anything else is created anew.
+    fn rebuild_to(&mut self, id: ClipId, frame: u16, host: &mut dyn Host) {
+        let (lib, cid) = {
+            let c = self.clip(id).unwrap();
+            (c.lib, c.cid)
+        };
+        let l = self.libs[lib as usize].clone();
+        let tl = if cid == ROOT_CID {
+            &l.lib.root
+        } else {
+            match l.lib.chars.get(&cid) {
+                Some(Char::Sprite(t)) => t,
+                _ => return,
+            }
+        };
+        // final state per depth: (placing frame, merged place)
+        let mut fin: std::collections::BTreeMap<i32, (u16, Place)> = std::collections::BTreeMap::new();
         for f in 1..=frame {
-            self.apply_cmds(id, lib, cid, f, host);
+            let Some(fr) = tl.frames.get(f as usize - 1) else { break };
+            for cmd in &fr.cmds {
+                match cmd {
+                    Cmd::Remove(d) => {
+                        fin.remove(&(*d as i32));
+                    }
+                    Cmd::Place(p) => {
+                        let d = p.depth as i32;
+                        match (p.id, fin.get_mut(&d)) {
+                            (Some(_), Some(e)) if p.is_move => {
+                                // character replaced in place: keeps the old transform unless given
+                                let mut np = p.clone();
+                                if np.matrix.is_none() {
+                                    np.matrix = e.1.matrix;
+                                }
+                                if np.cx.is_none() {
+                                    np.cx = e.1.cx;
+                                }
+                                if np.name.is_none() {
+                                    np.name = e.1.name.clone();
+                                }
+                                np.is_move = false;
+                                *e = (f, np);
+                            }
+                            (Some(_), _) => {
+                                let mut np = p.clone();
+                                np.is_move = false;
+                                fin.insert(d, (f, np));
+                            }
+                            (None, Some(e)) => {
+                                let q = &mut e.1;
+                                if p.matrix.is_some() {
+                                    q.matrix = p.matrix;
+                                }
+                                if p.cx.is_some() {
+                                    q.cx = p.cx;
+                                }
+                                if p.ratio.is_some() {
+                                    q.ratio = p.ratio;
+                                }
+                                if p.name.is_some() {
+                                    q.name = p.name.clone();
+                                }
+                                if p.clip_depth.is_some() {
+                                    q.clip_depth = p.clip_depth;
+                                }
+                                if p.blend.is_some() {
+                                    q.blend = p.blend;
+                                }
+                                if !p.filters.is_empty() {
+                                    q.filters = p.filters.clone();
+                                }
+                                if p.visible.is_some() {
+                                    q.visible = p.visible;
+                                }
+                                if !p.events.is_empty() {
+                                    q.events = p.events.clone();
+                                }
+                            }
+                            (None, None) => {}
+                        }
+                    }
+                }
+            }
+        }
+        // drop timeline children that do not survive into the target frame
+        let depths: Vec<i32> = self.clip(id).unwrap().tl_depths.iter().copied().collect();
+        for d in depths {
+            let Some(ch) = self.clip(id).and_then(|c| c.children.get(&d).copied()) else {
+                if let Some(c) = self.clip_mut(id) {
+                    c.tl_depths.remove(&d);
+                }
+                continue;
+            };
+            let (ccid, pf) = self.clip(ch).map(|c| (c.cid, c.place_frame)).unwrap_or((0, 0));
+            let keep = match fin.get(&d) {
+                Some((_, p)) => pf <= frame && p.id == Some(ccid),
+                None => false,
+            };
+            if !keep {
+                self.remove(ch);
+                if let Some(c) = self.clip_mut(id) {
+                    c.tl_depths.remove(&d);
+                }
+            }
+        }
+        // apply the final state
+        for (d, (f, p)) in fin {
+            let existing = self.clip(id).and_then(|c| c.children.get(&d).copied()).filter(|ch| self.clip(id).map(|c| c.tl_depths.contains(&d)).unwrap_or(false) && self.alive(*ch));
+            match existing {
+                Some(ch) => {
+                    let c = self.clip_mut(ch).unwrap();
+                    c.m = p.matrix.unwrap_or(Matrix::IDENTITY);
+                    c.prev_m = c.m;
+                    if let Some(cx) = p.cx {
+                        c.cx = cx;
+                    } else {
+                        c.cx = CXform::IDENTITY;
+                    }
+                    if let Some(r) = p.ratio {
+                        c.ratio = r;
+                    }
+                    if let Some(n) = &p.name {
+                        c.name = n.clone();
+                    }
+                    c.clip_depth = p.clip_depth;
+                    if let Some(b) = p.blend {
+                        c.blend = b;
+                    }
+                }
+                None => {
+                    self.placing_frame = f;
+                    self.place(id, lib, &p, host);
+                }
+            }
         }
     }
 
     /// Makes `frame` current for `id`: places/removes children, runs frame ops.
     fn enter_frame_of(&mut self, id: ClipId, frame: u16, host: &mut dyn Host) {
+        self.entering.push(id);
+        self.enter_frame_inner(id, frame, host);
+        self.entering.pop();
+    }
+
+    fn enter_frame_inner(&mut self, id: ClipId, frame: u16, host: &mut dyn Host) {
         let mut target = frame;
         let mut guard = 0;
         let mut first = true;
@@ -804,6 +961,7 @@ impl World {
             }
         };
         let Some(fr) = tl.frames.get(frame as usize - 1) else { return };
+        self.placing_frame = frame;
         for cmd in &fr.cmds {
             match cmd {
                 Cmd::Remove(d) => {
@@ -841,6 +999,10 @@ impl World {
             if let Some((m, cx, _)) = &inherit {
                 c.m = *m;
                 c.cx = *cx;
+            }
+            let pf = self.placing_frame;
+            if let Some(c) = self.clip_mut(id) {
+                c.place_frame = pf;
             }
             if let Some(pm) = self.clip_mut(parent) {
                 pm.children.insert(depth, id);
@@ -895,8 +1057,10 @@ impl World {
     /// Advances every timeline by one frame, parents before children.
     pub fn advance(&mut self, host: &mut dyn Host) {
         self.tick += 1;
+        self.flush_gotos(host);
         let root = self.root;
         self.advance_clip(root, host);
+        self.flush_gotos(host);
         let rem = std::mem::take(&mut self.pending_removals);
         for r in rem {
             self.remove(r);
@@ -1040,6 +1204,7 @@ impl Clip {
             total: 1,
             playing: true,
             tl_depths: HashSet::new(),
+            place_frame: 0,
             vars: HashMap::new(),
             events: Vec::new(),
             born: 0,

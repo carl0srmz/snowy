@@ -321,6 +321,7 @@ pub struct Level {
     pub curtain_done: bool,
     attack_pinku: Option<f32>,
     spawn_counter: i32,
+    pub noclip_check: bool,
 }
 
 /// Collects what scripts ask for; the game (UI or level) acts on it after the world step.
@@ -516,6 +517,7 @@ impl Level {
             curtain_done: false,
             attack_pinku: None,
             spawn_counter: 0,
+            noclip_check: std::env::var("NOCLIP_CHECK").is_ok(),
             data,
         };
         lv.apply_hero_pos(w);
@@ -1005,6 +1007,13 @@ impl Level {
                 }
             }
         }
+        if matches!(who, Who::Hero) && std::env::var("TRACE_HITS").is_ok() {
+            let list: Vec<String> = res.iter().map(|h| {
+                let ob = self.bounds(w, h.obstacle);
+                format!("a{}:{}({:.0},{:.0},{:.0},{:.0})", h.action, w.get_var(h.obstacle, "type").num(), ob.x0, ob.y0, ob.x1, ob.y1)
+            }).collect();
+            println!("  hits t={} box=({:.1},{:.1},{:.1},{:.1}) vy={:.2} {:?}", self.tick_count, b.x0, b.y0, b.x1, b.y1, vy, list);
+        }
         match who {
             Who::Hero => self.hero.on_movable = on_movable,
             Who::Enemy(i) => self.enemies[i].on_movable = on_movable,
@@ -1158,8 +1167,10 @@ impl Level {
                 c.r_action_up = true;
             }
             if c.jumpstage > 0 {
+                // original: `if (!(this.jumpcnt++ > this.jumpstage))` (post-increment)
+                let old = c.jumpcnt;
                 c.jumpcnt += 1;
-                if !(c.jumpcnt > c.jumpstage) {
+                if !(old > c.jumpstage) {
                     c.vy -= 5.0;
                     c.on_movable = None;
                 }
@@ -2002,8 +2013,9 @@ impl Level {
         if e.untouchable > 0 {
             w.set_var(ob, "type", Value::Num(-1.0));
             e.untouchable -= 1;
+            let old = e.hide_cnt;
             e.hide_cnt -= 1;
-            if e.hide_cnt == 0 {
+            if old == 0 {
                 let v = w.clip(ct).map(|c| c.visible).unwrap_or(true);
                 w.set_var(ct, "_visible", Value::Bool(!v));
                 e.hide_cnt = 2;
@@ -2045,11 +2057,15 @@ impl Level {
             // listener order of the original: tiles, game, scroll, hero, actors
             self.tiles_process(w, host);
             for (k, total, reset) in [("coinframe", 105.0, 1.0), ("waterframe", 43.0, 1.0), ("beeframe", 102.0, 2.0), ("cloudframe", 219.0, 2.0)] {
-                let v = w.globals.get(k).map(|v| v.num()).unwrap_or(0.0) + 1.0;
-                w.globals.insert(k.into(), Value::Num(if v < total { v } else { reset }));
+                let old = w.globals.get(k).map(|v| v.num()).unwrap_or(0.0);
+                w.globals.insert(k.into(), Value::Num(if old < total { old + 1.0 } else { reset }));
             }
             self.scroll_process();
+            let before = if self.noclip_check { Some(self.hero.box_rect()) } else { None };
             self.hero_process(w, host, input);
+            if let Some(b0) = before {
+                self.detect_noclip(w, b0);
+            }
             if self.outcome != Outcome::Dead {
                 self.enemies_process(w, host);
                 self.movers_process(w);
@@ -2068,6 +2084,51 @@ impl Level {
             self.curtain_done = true;
         }
         self.outcome
+    }
+
+    /// Dev check: the hero's box passed from above a solid top to below it without landing.
+    fn detect_noclip(&mut self, w: &World, b0: Rect) {
+        let b1 = self.hero.box_rect();
+        if self.hero.on_ladder {
+            return;
+        }
+        if self.hero.ly > 3000.0 && self.outcome == Outcome::Dead {
+            println!("FELL t={} last box {:.1},{:.1}", self.tick_count, b0.x0, b0.y1);
+        }
+        for o in self.obstacles(w) {
+            let ty = w.get_var(o, "type");
+            if ty.is_undef() {
+                continue;
+            }
+            let ty = ty.num() as i32;
+            if !(ty == O_MASSIVE || ty == 1) || w.get_var(o, "noTop").truthy() || w.get_var(o, "enemy").truthy() {
+                continue;
+            }
+            if ty == 1 && self.hero.vy < 0.0 {
+                continue;
+            }
+            let ob = self.bounds(w, o);
+            let overlap_x = b1.x1 - self.hero.pivot > ob.x0 && b1.x0 + self.hero.pivot < ob.x1;
+            let embedded = overlap_x && b1.y1 > ob.y0 + 20.0 && b1.y0 < ob.y1 - 5.0 && (ob.y1 - ob.y0) > 25.0;
+            if embedded || (overlap_x && b0.y1 <= ob.y0 + 0.5 && b1.y1 > ob.y0 + MAX_VEL + GRAVITY + TOLERANCE) {
+                println!(
+                    "NOCLIP t={} type={} ob=({:.1},{:.1},{:.1},{:.1}) box {:.1}->{:.1} hero=({:.1},{:.1}) vy={:.2} {}",
+                    self.tick_count, ty, ob.x0, ob.y0, ob.x1, ob.y1, b0.y1, b1.y1, self.hero.x, self.hero.y, self.hero.vy,
+                    w.clip(o).map(|c| w.clip(c.parent).map(|p| p.name.clone()).unwrap_or_default()).unwrap_or_default()
+                );
+            }
+        }
+    }
+
+    /// One-line dump of the hero's physics state (dev tracing).
+    pub fn debug_hero(&self) -> String {
+        let c = &self.hero;
+        format!(
+            "x={:7.1} y={:7.1} vx={:6.2} vy={:6.2} ox={:5.1} oy={:6.1} ground={} mv={} jumps={} stage={} cnt={} r_up={} ladder={}/{}/{} box=({:.1},{:.1},{:.1},{:.1})",
+            c.x, c.y, c.vx, c.vy, c.ox, c.oy, c.on_ground as u8, c.mv, c.jumps, c.jumpstage, c.jumpcnt, c.r_action_up as u8,
+            c.on_ladder as u8, c.hit_ladder as u8, c.upon_ladder as u8,
+            c.box_rect().x0, c.box_rect().y0, c.box_rect().x1, c.box_rect().y1
+        )
     }
 
     pub fn hero_pos(&self) -> (f32, f32) {

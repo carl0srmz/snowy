@@ -171,6 +171,10 @@ impl<'a> Cx<'a> {
     /// behaviour that the game implements by hand. The source text is recorded for reference.
     fn lowered(&mut self, data: &[u8]) -> Vec<Op> {
         let ops = scripts::lower(data, self.version);
+        if std::env::var("SWFX_LOWER_DUMP").is_ok() {
+            let key = scripts::script_id(&crate::decomp::decompile_tag_legacy(data, self.version));
+            eprintln!("LOWER {} {:?}", key, ops.iter().map(|o| match o { Op::Unknown(_) => "Unknown".to_string(), o => format!("{:?}", o) }).collect::<Vec<_>>());
+        }
         ops.into_iter()
             .map(|o| match o {
                 Op::Unknown(text) => {

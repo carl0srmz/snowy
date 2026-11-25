@@ -74,6 +74,7 @@ impl Ui {
         let size = args.get(4).map(|v| v.num()).filter(|n| n.is_finite()).unwrap_or(20.0) as f32;
         let show_button = args.get(5).map(|v| v.truthy()).unwrap_or(false);
         let text = self.intro_state.xml.text(&key);
+        log::debug!(target: "snd", "tick {} setText({}, piep{})", self.tick_no, key, piep);
         let txt = *txt;
         if let Some(t) = self.world.text_field_mut(txt) {
             t.set_text("");
@@ -121,7 +122,15 @@ impl Ui {
         if scene == NONE {
             return;
         }
-        self.waits.push(Wait { clip: scene, owner: b, ticks: (sec * 34.0) as i32, action: WaitAction::Play });
+        // b_weiter.counter = sec * 34; onEnterFrame: if (--counter == 0) scene.play()
+        // (assigning onEnterFrame replaces a pending delay; a non-integer count never reaches 0)
+        self.waits.retain(|w| w.owner != b);
+        let n = sec * 34.0;
+        if n.fract() != 0.0 || n < 1.0 {
+            return;
+        }
+        log::debug!(target: "snd", "tick {} setDelay({})", self.tick_no, sec);
+        self.waits.push(Wait { clip: scene, owner: b, ticks: n as i32, action: WaitAction::Play, fresh: true });
     }
 
     pub fn intro_show_worldmap(&mut self) {

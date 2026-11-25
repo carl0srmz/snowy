@@ -339,8 +339,9 @@
     stop();
     cnt = DELAY;
     this.onEnterFrame = function () {
+            var $old1 = cnt;
             cnt = cnt - 1;
-            if (cnt == 0) {
+            if ($old1 == 0) {
                 gotoAndPlay("attack_right_" + (random(2) + 1));
                 delete onEnterFrame;
             }
@@ -362,8 +363,9 @@
     stop();
     cnt = DELAY;
     this.onEnterFrame = function () {
+            var $old1 = cnt;
             cnt = cnt - 1;
-            if (cnt == 0) {
+            if ($old1 == 0) {
                 gotoAndPlay("attack_left_" + (random(2) + 1));
                 delete onEnterFrame;
             }
@@ -373,8 +375,9 @@
     cnt = DELAY;
     stop();
     this.onEnterFrame = function () {
+            var $old1 = cnt;
             cnt = cnt - 1;
-            if (cnt == 0) {
+            if ($old1 == 0) {
                 gotoAndPlay("attack_down_" + (random(3) + 1));
                 delete onEnterFrame;
             }
@@ -384,8 +387,9 @@
     cnt = DELAY;
     stop();
     this.onEnterFrame = function () {
+            var $old1 = cnt;
             cnt = cnt - 1;
-            if (cnt == 0) {
+            if ($old1 == 0) {
                 gotoAndPlay("attack_down_" + (random(3) + 1));
                 delete onEnterFrame;
             }
@@ -395,8 +399,9 @@
     cnt = DELAY;
     stop();
     this.onEnterFrame = function () {
+            var $old1 = cnt;
             cnt = cnt - 1;
-            if (cnt == 0) {
+            if ($old1 == 0) {
                 gotoAndPlay("attack_down_" + (random(3) + 1));
                 delete onEnterFrame;
             }
@@ -406,8 +411,9 @@
     cnt = DELAY;
     stop();
     this.onEnterFrame = function () {
+            var $old1 = cnt;
             cnt = cnt - 1;
-            if (cnt == 0) {
+            if ($old1 == 0) {
                 gotoAndPlay("attack_down_" + (random(3) + 1));
                 delete onEnterFrame;
             }
@@ -417,8 +423,9 @@
     cnt = DELAY;
     stop();
     this.onEnterFrame = function () {
+            var $old1 = cnt;
             cnt = cnt - 1;
-            if (cnt == 0) {
+            if ($old1 == 0) {
                 gotoAndPlay("bomb_" + nextdir);
                 delete onEnterFrame;
             }
@@ -428,8 +435,9 @@
     cnt = DELAY;
     stop();
     this.onEnterFrame = function () {
+            var $old1 = cnt;
             cnt = cnt - 1;
-            if (cnt == 0) {
+            if ($old1 == 0) {
                 gotoAndPlay("bomb_" + nextdir);
                 delete onEnterFrame;
             }
@@ -439,8 +447,9 @@
     cnt = DELAY;
     stop();
     this.onEnterFrame = function () {
+            var $old1 = cnt;
             cnt = cnt - 1;
-            if (cnt == 0) {
+            if ($old1 == 0) {
                 gotoAndPlay("bomb_" + nextdir);
                 delete onEnterFrame;
             }

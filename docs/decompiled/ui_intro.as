@@ -230,8 +230,9 @@ if (!_global.com.extratoxic.audio.SoundFile) {
                 this.start(0, 999);
             }
             this.movie.onEnterFrame = function () {
+                        var $old1 = this.counter;
                         this.counter = this.counter - 1;
-                        if (this.counter == 0) {
+                        if ($old1 == 0) {
                             this.volume = this.volume + (this.mod * 2);
                             this.snd.setVolume(this.volume);
                             if ((!(this.volume > 0) && (this.mod == -1)) || (!(this.volume < this.endVolume) && (this.mod == 1))) {
@@ -1697,8 +1698,9 @@ function ticker(txt, text, tf, onSoundComplete, speech) {
     oef_ticker.speechVolume = speech.getVolume();
     speech.start(0, 99);
     oef_ticker.onEnterFrame = function () {
+            var $old1 = this.pointer;
             this.pointer = this.pointer + 1;
-            $r2 = this.text.charAt(this.pointer);
+            $r2 = this.text.charAt($old1);
             if ($r2 == "\\") {
                 $r0 = this.pointer + 2;
                 this.pointer = $r0;

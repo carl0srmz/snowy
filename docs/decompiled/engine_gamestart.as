@@ -356,20 +356,24 @@ if (!_global.Game) {
     $r2.process = function () {
             this.mainScreen.fps.text = this.showFPS();
             this.mainScreen.vtiles.text = this.baselayer.visTilesNum;
+            var $old1 = _root.coinframe;
             _root.coinframe = _root.coinframe + 1;
-            if (!!!(_root.coinframe < _root.cointotal)) {
+            if (!!!($old1 < _root.cointotal)) {
                 _root.coinframe = 1;
             }
+            var $old2 = _root.waterframe;
             _root.waterframe = _root.waterframe + 1;
-            if (!!!(_root.waterframe < _root.watertotal)) {
+            if (!!!($old2 < _root.watertotal)) {
                 _root.waterframe = 1;
             }
+            var $old3 = _root.beeframe;
             _root.beeframe = _root.beeframe + 1;
-            if (!!!(_root.beeframe < _root.beetotal)) {
+            if (!!!($old3 < _root.beetotal)) {
                 _root.beeframe = 2;
             }
+            var $old4 = _root.cloudframe;
             _root.cloudframe = _root.cloudframe + 1;
-            if (!!!(_root.cloudframe < _root.cloudtotal)) {
+            if (!!!($old4 < _root.cloudtotal)) {
                 _root.cloudframe = 2;
             }
         };
@@ -398,8 +402,9 @@ if (!_global.com.extratoxic.audio.SoundPackage) {
                 this.movie = parent.soundPackages;
             }
             $r0 = com.extratoxic.audio.SoundPackage.packageId + 1;
+            var $old1 = com.extratoxic.audio.SoundPackage.packageId;
             com.extratoxic.audio.SoundPackage.packageId = $r0;
-            this.child = this.movie.createEmptyMovieClip("package" + $r0, com.extratoxic.audio.SoundPackage.packageId);
+            this.child = this.movie.createEmptyMovieClip("package" + $r0, $old1);
         };
     com.extratoxic.audio.SoundPackage = $r1;
     $r2 = $r1.prototype;
@@ -512,8 +517,9 @@ if (!_global.com.extratoxic.audio.SoundFile) {
                 this.start(0, 999);
             }
             this.movie.onEnterFrame = function () {
+                        var $old1 = this.counter;
                         this.counter = this.counter - 1;
-                        if (this.counter == 0) {
+                        if ($old1 == 0) {
                             this.volume = this.volume + (this.mod * 2);
                             this.snd.setVolume(this.volume);
                             if ((!(this.volume > 0) && (this.mod == -1)) || (!(this.volume < this.endVolume) && (this.mod == 1))) {
@@ -930,8 +936,9 @@ if (!_global.com.extratoxic.game.tilemap.Tile) {
             this.off = false;
             this.active = false;
             this.motion = false;
+            var $old1 = com.extratoxic.game.tilemap.HandleTiles.idcnt;
             com.extratoxic.game.tilemap.HandleTiles.idcnt = com.extratoxic.game.tilemap.HandleTiles.idcnt + 1;
-            this.id = com.extratoxic.game.tilemap.HandleTiles.idcnt;
+            this.id = $old1;
         };
     com.extratoxic.game.tilemap.Tile = $r1;
     $r2 = $r1.prototype;
@@ -1956,8 +1963,9 @@ if (!_global.actors.Char) {
                 }
             }
             if (this.jumpstage > 0) {
+                var $old1 = this.jumpcnt;
                 this.jumpcnt = this.jumpcnt + 1;
-                if (!!!(this.jumpcnt > this.jumpstage)) {
+                if (!!!($old1 > this.jumpstage)) {
                     this.vy = this.vy - 5;
                     this.collisionUtil.onMovable = undefined;
                 }
@@ -2915,8 +2923,9 @@ if (!_global.actors.Joggybear) {
         };
     $r2.throwIceball = function (Void) {
             $r0 = actors.Joggybear.depthcnt + 1;
+            var $old1 = actors.Joggybear.depthcnt;
             actors.Joggybear.depthcnt = $r0;
-            $r2 = this.layer.attachMovie("iceball", "iceball" + $r0, actors.Joggybear.depthcnt, {_y: this.actor._y - 8, _x: this.actor._x - 35});
+            $r2 = this.layer.attachMovie("iceball", "iceball" + $r0, $old1, {_y: this.actor._y - 8, _x: this.actor._x - 35});
             this.tile.enemyUtil.create($r2, "iceball");
             if (actors.Joggybear.depthcnt > 50010) {
                 actors.Joggybear.depthcnt = 50000;
@@ -3909,8 +3918,9 @@ if (!_global.actors.ElPix) {
             if (this.untouchable > 0) {
                 this.actor.obstacle.type = -1;
                 this.untouchable = this.untouchable - 1;
+                var $old2 = this.untouchable_hide;
                 this.untouchable_hide = this.untouchable_hide - 1;
-                if (this.untouchable_hide == 0) {
+                if ($old2 == 0) {
                     this.actor.container._visible = !this.actor.container._visible;
                     this.untouchable_hide = this.UNTOUCHABLE_HIDE;
                 }
@@ -3941,8 +3951,9 @@ if (!_global.actors.ElPix) {
                 $r5 = this.actor.container._y + 210;
             }
             $r0 = actors.ElPix.depthcnt + 1;
+            var $old1 = actors.ElPix.depthcnt;
             actors.ElPix.depthcnt = $r0;
-            $r2 = this.layer.attachMovie($r4, "pinku" + $r0, actors.ElPix.depthcnt, {_y: $r5, _x: $r3});
+            $r2 = this.layer.attachMovie($r4, "pinku" + $r0, $old1, {_y: $r5, _x: $r3});
             if (this.actor.container._x < 0) {
                 $r2.dir = 1;
             }
@@ -4683,8 +4694,9 @@ if (!_global.com.extratoxic.utils.LoadStack) {
                 this.push(arguments[$r4]);
                 $r4 = $r4 + 1;
             }
+            var $old1 = com.extratoxic.utils.LoadStack.idcnt;
             com.extratoxic.utils.LoadStack.idcnt = com.extratoxic.utils.LoadStack.idcnt + 1;
-            this.id = com.extratoxic.utils.LoadStack.idcnt;
+            this.id = $old1;
             $r4 = 0;
             while ($r4 < this.length) {
                 $r4 = $r4 + 1;
@@ -4715,8 +4727,9 @@ if (!_global.com.extratoxic.utils.LoadStack) {
             }
             this.loading = true;
             if (this.pointer < this.length) {
+                var $old2 = this.pointer;
                 this.pointer = this.pointer + 1;
-                this.currentLoader = this[this.pointer];
+                this.currentLoader = this[$old2];
                 this.currentLoader.addListener(this);
                 this.currentLoader.load();
             } else {
@@ -4830,8 +4843,9 @@ if (!_global.com.extratoxic.utils.Loader) {
                     this.container.loaded = true;
                 }
                 if (($r3 == $r2) && this.container.loaded) {
+                    var $old1 = this.delay;
                     this.delay = this.delay - 1;
-                    if (this.delay > 0) {
+                    if ($old1 > 0) {
                         return;
                     }
                     this.isLoaded = true;

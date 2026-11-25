@@ -5508,8 +5508,9 @@ if (!_global.mx.video.UIManager) {
     $r2.setCustomClips = function (prefix) {
             $r4 = 1;
             while (!false) {
+                var $old1 = $r4;
                 $r4 = $r4 + 1;
-                $r2 = this.layout_mc[(prefix + $r4) + "_mc"];
+                $r2 = this.layout_mc[(prefix + $old1) + "_mc"];
                 if ($r2 == undefined) {
                     break;
                 }
@@ -8834,8 +8835,9 @@ if (!_global.mx.video.CuePointManager) {
             if ((this._owner.getVideoPlayer(this._id).__get__stateResponsive() && !(this.asCuePoints == null)) && !(this.asCuePoints == undefined)) {
                 while (true) {
                     if (!((this._asCuePointIndex < this.asCuePoints.length) && !(this.asCuePoints[this._asCuePointIndex].time > ($r5 + this._asCuePointTolerance)))) break;
+                    var $old1 = this._asCuePointIndex;
                     this._asCuePointIndex = this._asCuePointIndex + 1;
-                    this._owner.dispatchEvent({vp: this._id, info: mx.video.CuePointManager.deepCopyObject(this.asCuePoints[this._asCuePointIndex]), type: "cuePoint"});
+                    this._owner.dispatchEvent({vp: this._id, info: mx.video.CuePointManager.deepCopyObject(this.asCuePoints[$old1]), type: "cuePoint"});
                 }
             }
         };
@@ -8866,8 +8868,9 @@ if (!_global.mx.video.CuePointManager) {
             this._disabledCuePoints = new Array();
             $r9 = 0;
             while (true) {
+                var $old2 = $r9;
                 $r9 = $r9 + 1;
-                $r2 = this.flvCuePoints[$r9];
+                $r2 = this.flvCuePoints[$old2];
                 if (!!($r2 == undefined)) break;
                 if (($r6 > 0) && !($r6 < $r2.time)) {
                     this.flvCuePoints = null;
@@ -8929,8 +8932,9 @@ if (!_global.mx.video.CuePointManager) {
                                             goto L069d;
                                             this.addOrDisable($r9, $r5);
                                             $r4 = 0;
+                                            var $old27 = $r2;
                                             $r2 = $r2 + 1;
-                                            if (!!!(cuePoints[$r2] == "t")) {
+                                            if (!!!(cuePoints[$old27] == "t")) {
                                                 throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                                             }
                                             if (isNaN(cuePoints[$r2])) {
@@ -8940,8 +8944,9 @@ if (!_global.mx.video.CuePointManager) {
                                             $r5.time = cuePoints[$r2] / 1000;
                                             $r4 = $r4 + 1;
                                             goto L069d;
+                                            var $old28 = $r2;
                                             $r2 = $r2 + 1;
-                                            if (!!!(cuePoints[$r2] == "n")) {
+                                            if (!!!(cuePoints[$old28] == "n")) {
                                                 throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                                             }
                                             if ((cuePoints[$r2] == undefined) || (cuePoints[$r2] == null)) {
@@ -8950,8 +8955,9 @@ if (!_global.mx.video.CuePointManager) {
                                             $r5.name = this.unescape(cuePoints[$r2]);
                                             $r4 = $r4 + 1;
                                             goto L069d;
+                                            var $old29 = $r2;
                                             $r2 = $r2 + 1;
-                                            if (!!!(cuePoints[$r2] == "t")) {
+                                            if (!!!(cuePoints[$old29] == "t")) {
                                                 throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                                             }
                                             if (isNaN(cuePoints[$r2])) {
@@ -8988,8 +8994,9 @@ if (!_global.mx.video.CuePointManager) {
                                             throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "type must be 0, 1 or 2");
                                             $r4 = $r4 + 1;
                                             goto L069d;
+                                            var $old30 = $r2;
                                             $r2 = $r2 + 1;
-                                            if (!!!(cuePoints[$r2] == "d")) {
+                                            if (!!!(cuePoints[$old30] == "d")) {
                                                 throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                                             }
                                             if (isNaN(cuePoints[$r2])) {
@@ -8998,8 +9005,9 @@ if (!_global.mx.video.CuePointManager) {
                                             $r9 = !(cuePoints[$r2] == 0);
                                             $r4 = $r4 + 1;
                                             goto L069d;
+                                            var $old31 = $r2;
                                             $r2 = $r2 + 1;
-                                            if (!!!(cuePoints[$r2] == "p")) {
+                                            if (!!!(cuePoints[$old31] == "p")) {
                                                 throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                                             }
                                             if (isNaN(cuePoints[$r2])) {
@@ -9013,8 +9021,9 @@ if (!_global.mx.video.CuePointManager) {
                                                 $r5.parameters = new Object();
                                             }
                                         } else {
+                                            var $old32 = $r2;
                                             $r2 = $r2 + 1;
-                                            $r6 = cuePoints[$r2];
+                                            $r6 = cuePoints[$old32];
                                             $r7 = cuePoints[$r2];
                                             if (typeof $r6 == "string") {
                                                 $r6 = this.unescape($r6);
@@ -9030,8 +9039,9 @@ if (!_global.mx.video.CuePointManager) {
                                             goto L069d;
                                         }
                                     } else {
+                                        var $old33 = $r2;
                                         $r2 = $r2 + 1;
-                                        if (!!!(cuePoints[$r2] == "p")) {
+                                        if (!!!(cuePoints[$old33] == "p")) {
                                             throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                                         }
                                         if (isNaN(cuePoints[$r2])) {
@@ -9045,8 +9055,9 @@ if (!_global.mx.video.CuePointManager) {
                                             $r5.parameters = new Object();
                                         }
                                         goto L069d;
+                                        var $old34 = $r2;
                                         $r2 = $r2 + 1;
-                                        $r6 = cuePoints[$r2];
+                                        $r6 = cuePoints[$old34];
                                         $r7 = cuePoints[$r2];
                                         if (typeof $r6 == "string") {
                                             $r6 = this.unescape($r6);
@@ -9062,8 +9073,9 @@ if (!_global.mx.video.CuePointManager) {
                                         goto L069d;
                                     }
                                 } else {
+                                    var $old35 = $r2;
                                     $r2 = $r2 + 1;
-                                    if (!!!(cuePoints[$r2] == "d")) {
+                                    if (!!!(cuePoints[$old35] == "d")) {
                                         throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                                     }
                                     if (isNaN(cuePoints[$r2])) {
@@ -9072,8 +9084,9 @@ if (!_global.mx.video.CuePointManager) {
                                     $r9 = !(cuePoints[$r2] == 0);
                                     $r4 = $r4 + 1;
                                     goto L069d;
+                                    var $old36 = $r2;
                                     $r2 = $r2 + 1;
-                                    if (!!!(cuePoints[$r2] == "p")) {
+                                    if (!!!(cuePoints[$old36] == "p")) {
                                         throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                                     }
                                     if (isNaN(cuePoints[$r2])) {
@@ -9087,8 +9100,9 @@ if (!_global.mx.video.CuePointManager) {
                                         $r5.parameters = new Object();
                                     }
                                     goto L069d;
+                                    var $old37 = $r2;
                                     $r2 = $r2 + 1;
-                                    $r6 = cuePoints[$r2];
+                                    $r6 = cuePoints[$old37];
                                     $r7 = cuePoints[$r2];
                                     if (typeof $r6 == "string") {
                                         $r6 = this.unescape($r6);
@@ -9104,8 +9118,9 @@ if (!_global.mx.video.CuePointManager) {
                                     goto L069d;
                                 }
                             } else {
+                                var $old38 = $r2;
                                 $r2 = $r2 + 1;
-                                if (!!!(cuePoints[$r2] == "t")) {
+                                if (!!!(cuePoints[$old38] == "t")) {
                                     throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                                 }
                                 if (isNaN(cuePoints[$r2])) {
@@ -9142,8 +9157,9 @@ if (!_global.mx.video.CuePointManager) {
                                 throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "type must be 0, 1 or 2");
                                 $r4 = $r4 + 1;
                                 goto L069d;
+                                var $old39 = $r2;
                                 $r2 = $r2 + 1;
-                                if (!!!(cuePoints[$r2] == "d")) {
+                                if (!!!(cuePoints[$old39] == "d")) {
                                     throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                                 }
                                 if (isNaN(cuePoints[$r2])) {
@@ -9152,8 +9168,9 @@ if (!_global.mx.video.CuePointManager) {
                                 $r9 = !(cuePoints[$r2] == 0);
                                 $r4 = $r4 + 1;
                                 goto L069d;
+                                var $old40 = $r2;
                                 $r2 = $r2 + 1;
-                                if (!!!(cuePoints[$r2] == "p")) {
+                                if (!!!(cuePoints[$old40] == "p")) {
                                     throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                                 }
                                 if (isNaN(cuePoints[$r2])) {
@@ -9167,8 +9184,9 @@ if (!_global.mx.video.CuePointManager) {
                                     $r5.parameters = new Object();
                                 }
                                 goto L069d;
+                                var $old41 = $r2;
                                 $r2 = $r2 + 1;
-                                $r6 = cuePoints[$r2];
+                                $r6 = cuePoints[$old41];
                                 $r7 = cuePoints[$r2];
                                 if (typeof $r6 == "string") {
                                     $r6 = this.unescape($r6);
@@ -9184,8 +9202,9 @@ if (!_global.mx.video.CuePointManager) {
                                 goto L069d;
                             }
                         } else {
+                            var $old42 = $r2;
                             $r2 = $r2 + 1;
-                            if (!!!(cuePoints[$r2] == "n")) {
+                            if (!!!(cuePoints[$old42] == "n")) {
                                 throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                             }
                             if ((cuePoints[$r2] == undefined) || (cuePoints[$r2] == null)) {
@@ -9194,8 +9213,9 @@ if (!_global.mx.video.CuePointManager) {
                             $r5.name = this.unescape(cuePoints[$r2]);
                             $r4 = $r4 + 1;
                             goto L069d;
+                            var $old43 = $r2;
                             $r2 = $r2 + 1;
-                            if (!!!(cuePoints[$r2] == "t")) {
+                            if (!!!(cuePoints[$old43] == "t")) {
                                 throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                             }
                             if (isNaN(cuePoints[$r2])) {
@@ -9232,8 +9252,9 @@ if (!_global.mx.video.CuePointManager) {
                             throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "type must be 0, 1 or 2");
                             $r4 = $r4 + 1;
                             goto L069d;
+                            var $old44 = $r2;
                             $r2 = $r2 + 1;
-                            if (!!!(cuePoints[$r2] == "d")) {
+                            if (!!!(cuePoints[$old44] == "d")) {
                                 throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                             }
                             if (isNaN(cuePoints[$r2])) {
@@ -9242,8 +9263,9 @@ if (!_global.mx.video.CuePointManager) {
                             $r9 = !(cuePoints[$r2] == 0);
                             $r4 = $r4 + 1;
                             goto L069d;
+                            var $old45 = $r2;
                             $r2 = $r2 + 1;
-                            if (!!!(cuePoints[$r2] == "p")) {
+                            if (!!!(cuePoints[$old45] == "p")) {
                                 throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                             }
                             if (isNaN(cuePoints[$r2])) {
@@ -9257,8 +9279,9 @@ if (!_global.mx.video.CuePointManager) {
                                 $r5.parameters = new Object();
                             }
                             goto L069d;
+                            var $old46 = $r2;
                             $r2 = $r2 + 1;
-                            $r6 = cuePoints[$r2];
+                            $r6 = cuePoints[$old46];
                             $r7 = cuePoints[$r2];
                             if (typeof $r6 == "string") {
                                 $r6 = this.unescape($r6);
@@ -9277,8 +9300,9 @@ if (!_global.mx.video.CuePointManager) {
                 } else {
                     this.addOrDisable($r9, $r5);
                     $r4 = 0;
+                    var $old47 = $r2;
                     $r2 = $r2 + 1;
-                    if (!!!(cuePoints[$r2] == "t")) {
+                    if (!!!(cuePoints[$old47] == "t")) {
                         throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                     }
                     if (isNaN(cuePoints[$r2])) {
@@ -9288,8 +9312,9 @@ if (!_global.mx.video.CuePointManager) {
                     $r5.time = cuePoints[$r2] / 1000;
                     $r4 = $r4 + 1;
                     goto L069d;
+                    var $old48 = $r2;
                     $r2 = $r2 + 1;
-                    if (!!!(cuePoints[$r2] == "n")) {
+                    if (!!!(cuePoints[$old48] == "n")) {
                         throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                     }
                     if ((cuePoints[$r2] == undefined) || (cuePoints[$r2] == null)) {
@@ -9298,8 +9323,9 @@ if (!_global.mx.video.CuePointManager) {
                     $r5.name = this.unescape(cuePoints[$r2]);
                     $r4 = $r4 + 1;
                     goto L069d;
+                    var $old49 = $r2;
                     $r2 = $r2 + 1;
-                    if (!!!(cuePoints[$r2] == "t")) {
+                    if (!!!(cuePoints[$old49] == "t")) {
                         throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                     }
                     if (isNaN(cuePoints[$r2])) {
@@ -9336,8 +9362,9 @@ if (!_global.mx.video.CuePointManager) {
                     throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "type must be 0, 1 or 2");
                     $r4 = $r4 + 1;
                     goto L069d;
+                    var $old50 = $r2;
                     $r2 = $r2 + 1;
-                    if (!!!(cuePoints[$r2] == "d")) {
+                    if (!!!(cuePoints[$old50] == "d")) {
                         throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                     }
                     if (isNaN(cuePoints[$r2])) {
@@ -9346,8 +9373,9 @@ if (!_global.mx.video.CuePointManager) {
                     $r9 = !(cuePoints[$r2] == 0);
                     $r4 = $r4 + 1;
                     goto L069d;
+                    var $old51 = $r2;
                     $r2 = $r2 + 1;
-                    if (!!!(cuePoints[$r2] == "p")) {
+                    if (!!!(cuePoints[$old51] == "p")) {
                         throw new mx.video.VideoError(mx.video.VideoError.ILLEGAL_CUE_POINT, "unexpected cuePoint parameter format");
                     }
                     if (isNaN(cuePoints[$r2])) {
@@ -9361,8 +9389,9 @@ if (!_global.mx.video.CuePointManager) {
                         $r5.parameters = new Object();
                     }
                     goto L069d;
+                    var $old52 = $r2;
                     $r2 = $r2 + 1;
-                    $r6 = cuePoints[$r2];
+                    $r6 = cuePoints[$old52];
                     $r7 = cuePoints[$r2];
                     if (typeof $r6 == "string") {
                         $r6 = this.unescape($r6);
@@ -9401,8 +9430,9 @@ if (!_global.mx.video.CuePointManager) {
             $r3 = origStr;
             $r1 = 0;
             while ($r1 < mx.video.CuePointManager.cuePointsReplace.length) {
+                var $old1 = $r1;
                 $r1 = $r1 + 1;
-                $r2 = $r3.split(mx.video.CuePointManager.cuePointsReplace[$r1]);
+                $r2 = $r3.split(mx.video.CuePointManager.cuePointsReplace[$old1]);
                 if ($r2.length > 1) {
                     $r3 = $r2.join(mx.video.CuePointManager.cuePointsReplace[$r1]);
                 }

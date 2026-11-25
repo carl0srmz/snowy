@@ -154,7 +154,7 @@ fn main() {
                 }
                 Some(snow_fmt::Char::Sprite(t)) => {
                     println!("sprite {} frames {} labels {:?}", id, t.frames.len(), t.labels);
-                    for (i, f) in t.frames.iter().enumerate().take(7) {
+                    for (i, f) in t.frames.iter().enumerate().take(std::env::var("INFO_FRAMES").ok().and_then(|v| v.parse().ok()).unwrap_or(7)) {
                         let cmds: Vec<String> = f.cmds.iter().map(|c| match c {
                             snow_fmt::Cmd::Place(p) => format!("P(d{} id{:?} mv{} name{:?} clip{:?} a{:?} m{:?})", p.depth, p.id, p.is_move, p.name, p.clip_depth, p.cx.map(|c| c.mul[3]), p.matrix.map(|m| (m.a, m.d, m.tx, m.ty))),
                             snow_fmt::Cmd::Remove(d) => format!("R(d{})", d),

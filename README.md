@@ -103,13 +103,15 @@ world map with played/open/closed doors, the lab (list, greeting tickers, info w
 screenshots with counter, FLV video playback), help / feedback / impressum / credits, the intro
 (play and skip, with its filters), all four languages, and a windowed run under Xvfb.
 
+Gameplay rules are checked against the original bytecode, not just the decompiled text: the
+decompiler keeps `x++`/`x--` used inside expressions as post-increments (it used to apply them
+early, which made the jump four times too low and shifted every `cnt-- == 0` timer by one frame).
+
 Developer drivers: `snowdrift ui <assets> <repo> --script "tick:60;click:x,y;shot:out.png;..."`,
 `snowdrift level <assets> <repo> N --script ...`, `snowdrift shot`, `snowdrift tree`.
 
 ## Deliberate deviations from the Flash original
 
-* The original's `Ticker` dropped the first character of each text and `fadeIn()` without a delay
-  never faded in; both are fixed here.
 * The lab's invisible blocker button stays disabled (it only existed to swallow clicks while
   loading).
 * Online-only features (feedback upload, external links) save locally / open in the system browser.

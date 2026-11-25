@@ -292,11 +292,16 @@ impl Ui {
             return;
         }
         let b = self.lounge.clone();
-        self.lounge_voice = self.play_named(&b, "track", 999, if fade_in { 0.0 } else { 1.0 });
-        self.lounge_vol = if fade_in { 0.0 } else { 100.0 };
+        // s_lounge.fadeIn() = SoundFile.fade(1): restart at 0, +2 volume per frame up to the
+        // sound's volume (100 when it was 0)
+        let end = if self.lounge_vol <= 0.0 { 100.0 } else { self.lounge_vol };
+        self.lounge_voice = self.play_named(&b, "track", 999, if fade_in { 0.0 } else { end / 100.0 });
         if fade_in {
-            self.lounge_fade_to(100.0);
+            if let Some(v) = self.lounge_voice {
+                self.audio.fade_to(v, end / 100.0, (end / 2.0) / TICK_HZ, false);
+            }
         }
+        self.lounge_vol = end;
     }
 
     pub fn lounge_fade_to(&mut self, vol: f32) {
@@ -830,17 +835,23 @@ impl Ui {
             if !self.tickers[i].started {
                 continue;
             }
+            // utils.Ticker.process: c = text.charAt(pointer++); "\\" skips two; done when pointer == length
             let (target, ch, done_now) = {
                 let t = &mut self.tickers[i];
-                let ch = t.text.get(t.pos).copied();
+                let old = t.pos;
                 t.pos += 1;
-                (t.target, ch, t.pos > t.text.len())
-            };
-            if let Some(c) = ch {
-                if let Some(v) = self.tickers[i].voice {
-                    let vol = if c == ' ' { 0.0 } else { self.tickers[i].vol };
-                    self.audio.set_volume(v, vol);
+                let mut ch = t.text.get(old).copied();
+                if ch == Some('\\') {
+                    t.pos += 2;
+                    ch = t.text.get(t.pos).copied();
                 }
+                (t.target, ch, t.pos == t.text.len())
+            };
+            if let Some(v) = self.tickers[i].voice {
+                let vol = if ch == Some(' ') { 0.0 } else { self.tickers[i].vol };
+                self.audio.set_volume(v, vol);
+            }
+            if let Some(c) = ch {
                 let mut s = String::new();
                 if let Some(t) = self.world.text_field(target) {
                     s = t.text();
