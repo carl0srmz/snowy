@@ -143,6 +143,8 @@ pub enum Outcome {
 #[derive(Clone, Debug)]
 pub enum Sfx {
     Player(&'static str),
+    /// Sound.start(0, loops) of a player sound
+    PlayerLoops(&'static str, u32),
     Effect(&'static str),
     PlayerStop(&'static str),
     MusicStart,
@@ -279,6 +281,8 @@ struct Mover {
     pub slip: f32,
     pub glide: f32,
     dir: i32,
+    /// PlatformUtil: the mover's splash sound (s_splash)
+    sound: Option<&'static str>,
 }
 
 fn lerp_clamp(v: f32, lo: f32, hi: f32) -> f32 {
@@ -312,7 +316,9 @@ pub struct Level {
     enemies: Vec<Char>,
     enemy_of_clip: HashMap<ClipId, usize>,
     movers: HashMap<ClipId, Mover>,
-    pending_mover: HashMap<ClipId, MoverKind>,
+    pending_mover: HashMap<ClipId, (MoverKind, Option<&'static str>)>,
+    /// sound objects the tile scripts address by name (moby's `sprudel`): (clip, var, sound)
+    pub new_sound_objs: Vec<(ClipId, &'static str, &'static str)>,
     off_links: Vec<String>,
     hud_crystals: ClipId,
     hud_energy: ClipId,
@@ -515,6 +521,7 @@ impl Level {
             enemy_of_clip: HashMap::new(),
             movers: HashMap::new(),
             pending_mover: HashMap::new(),
+            new_sound_objs: Vec::new(),
             off_links,
             hud_crystals,
             hud_energy,
@@ -672,7 +679,18 @@ impl Level {
             self.pending_enemy(clip, i);
         } else {
             if let Some(k) = mover_kind(&link) {
-                self.pending_mover.insert(clip, k);
+                // PlatformUtil.create: the splash sound each mover gets
+                let snd = match link.as_str() {
+                    "floe" => Some("splash"),
+                    "floe_b" => Some("splash2"),
+                    "stamm_s" | "p_ds" | "p_ds_b" => Some("blub"),
+                    _ => None,
+                };
+                self.pending_mover.insert(clip, (k, snd));
+            }
+            if link == "moby" {
+                // movie.sprudel = soundEffects.getNewSound("sprudel")
+                self.new_sound_objs.push((clip, "sprudel", "sprudel"));
             }
             if off_now {
                 w.goto_label(clip, "off", false);
@@ -806,12 +824,12 @@ impl Level {
             }
             return;
         }
-        if let Some(k) = self.pending_mover.remove(&clip) {
-            self.make_mover(w, clip, k);
+        if let Some((k, snd)) = self.pending_mover.remove(&clip) {
+            self.make_mover(w, clip, k, snd);
         }
     }
 
-    fn make_mover(&mut self, w: &mut World, tile_clip: ClipId, kind: MoverKind) {
+    fn make_mover(&mut self, w: &mut World, tile_clip: ClipId, kind: MoverKind, sound: Option<&'static str>) {
         let obstacle = w.child_named(tile_clip, "obstacle").or_else(|| w.child_named(tile_clip, "obstacle1"));
         let platform = w.child_named(tile_clip, "platform").unwrap_or(NONE);
         let Some(ob) = obstacle else { return };
@@ -826,11 +844,12 @@ impl Level {
             let f = w.get_var(ob, "force");
             if f.is_undef() { 1000.0 } else { f.num() as f32 }
         };
-        let pivot = w.bounds_in(ob, ob).map(|b| (b.width() / 2.0).trunc()).unwrap_or(0.0);
+        // int(this.obstacle._width / 2): the width as seen by the tile (scale/rotation included)
+        let pivot = w.bounds_in(ob, tile_clip).map(|b| (b.width() / 2.0).trunc()).unwrap_or(0.0);
         let plat_y = if platform != NONE { w.get_var(platform, "_y").num() as f32 } else { 0.0 };
         self.movers.insert(
             ob,
-            Mover { kind, obstacle: ob, platform, level, vy: tide, offset: plat_y - level, limit: level + 30.0, angle: 0.0, drift: 0.0, force, max_angle, max_move, pivot, slip: 0.0, glide: 0.0, dir: 1 },
+            Mover { kind, obstacle: ob, platform, level, vy: tide, offset: plat_y - level, limit: level + 30.0, angle: 0.0, drift: 0.0, force, max_angle, max_move, pivot, slip: 0.0, glide: 0.0, dir: 1, sound },
         );
         // collision code reads these off the obstacle clip
         w.set_var(ob, "ease", Value::Bool(matches!(kind, MoverKind::Stamm | MoverKind::Tilting | MoverKind::Cloud)));
@@ -891,6 +910,16 @@ impl Level {
                 w.set_var(k, "slip", Value::Num(m.slip as f64));
                 w.set_var(k, "glide", Value::Num(m.glide as f64));
                 w.set_var(k, "dir", Value::Num(m.dir as f64));
+                if m.kind == MoverKind::Wackel {
+                    // the side colliders follow the tilted platform
+                    let tile = w.clip(k).map(|c| c.parent).unwrap_or(NONE);
+                    if let Some(b) = w.bounds_in(k, tile) {
+                        let o2 = w.path(tile, "obstacle2");
+                        let o3 = w.path(tile, "obstacle3");
+                        w.set_var(o2, "_x", Value::Num(b.x0 as f64));
+                        w.set_var(o3, "_x", Value::Num(b.x1 as f64));
+                    }
+                }
             }
         }
     }
@@ -1103,18 +1132,37 @@ impl Level {
         }
     }
 
-    fn mover_push(&mut self, _w: &mut World, ob: ClipId, vy: f32) {
+    /// obstacle.push(vy) of the movers: sink under the weight, splash when landing hard.
+    fn mover_push(&mut self, w: &mut World, ob: ClipId, vy: f32) {
+        let y = w.get_var(ob, "_y").num() as f32;
+        let mut splash = None;
         if let Some(m) = self.movers.get_mut(&ob) {
             match m.kind {
                 MoverKind::Cloud => {
-                    if !(m.level + 0.0 > 0.0 && false) {
+                    if !(y > m.limit) {
                         m.vy -= vy;
                     }
+                    // move_cloud gets no sound
                 }
-                MoverKind::Stamm => m.vy -= vy,
-                MoverKind::Tilting => m.vy -= vy,
+                MoverKind::Stamm => {
+                    m.vy -= vy;
+                    if vy / 15.0 > 0.3 {
+                        splash = m.sound;
+                    }
+                }
+                MoverKind::Tilting => {
+                    if y < (m.level + vy / 15.0) + 8.0 {
+                        m.vy -= vy;
+                    }
+                    if vy / 15.0 > 0.3 {
+                        splash = m.sound;
+                    }
+                }
                 MoverKind::Wackel => {}
             }
+        }
+        if let Some(n) = splash {
+            self.sfx.push(Sfx::Effect(n));
         }
     }
 }
@@ -1568,14 +1616,16 @@ impl Level {
         w.jump(self.hero.actor, 1, false, host);
         self.outcome = Outcome::Dead;
         self.hero_frozen = true;
+        // Hero.event_dieEffect: s_hurt.start(0, 2), music and steps stop, game-over jingle
         self.sfx.push(Sfx::MusicStop);
-        self.sfx.push(Sfx::Player("hurt"));
+        self.sfx.push(Sfx::PlayerLoops("hurt", 2));
         self.sfx.push(Sfx::PlayerStop("steps"));
         self.sfx.push(Sfx::Player("gameover"));
         // everything but the hero stops
         let (base, hero) = (self.base, self.hero.actor);
         w.stop_subtree(base, hero);
-        for i in 1..self.energymax {
+        // the remaining hearts break: energy_1 .. energy_(energy-1) (none if an enemy took the last one)
+        for i in 1..self.hero.energy {
             if let Some(h) = w.child_named(self.hud_energy, &format!("energy_{}", i)) {
                 w.jump_label(h, "lost", true, host);
             }

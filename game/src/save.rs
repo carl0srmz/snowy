@@ -75,17 +75,23 @@ impl Save {
         if self.doors[door].is_none() || (self.doors[door] == Some(false) && bonus) {
             self.doors[door] = Some(bonus);
         }
-        if !self.lab.contains(&(door as u32)) && door < 24 {
-            self.lab.push(door as u32);
+        // newest first (lab.splice(0, 0, door)), while the list has fewer than 24 entries
+        if !self.lab.contains(&(door as u32)) && self.lab.len() != 24 {
+            self.lab.insert(0, door as u32);
         }
         if container {
-            let w = match door + 1 {
-                1..=6 => 0,
-                7..=12 => 1,
-                13..=18 => 2,
-                _ => 3,
+            // The original tests the 0-based door against 1-based ranges (1..6, 7..12, ...):
+            // level 1's container is not stored and level 7's counts for the first world.
+            let slot = match door {
+                1..=6 => Some(0),
+                7..=12 => Some(1),
+                13..=18 => Some(2),
+                19..=24 => Some(3),
+                _ => None,
             };
-            self.container[w] = true;
+            if let Some(w) = slot {
+                self.container[w] = true;
+            }
         }
         self.flush();
     }

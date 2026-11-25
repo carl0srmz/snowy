@@ -777,6 +777,9 @@ impl Ui {
             if let Some(c) = self.world.clip_mut(sch) {
                 c.vars.insert("speech2".into(), Value::Str(t));
             }
+        } else if let Some(c) = self.world.clip_mut(sch) {
+            // schwabbel.speech2 = undefined
+            c.vars.remove("speech2");
         }
         self.set_visible("worldmap", false);
         self.reset_game_keep_ui();
@@ -993,6 +996,11 @@ impl Ui {
         }
         if let Some(g) = self.game.as_mut() {
             g.level.tick(&mut self.world, &mut self.host, input);
+            let objs = std::mem::take(&mut g.level.new_sound_objs);
+            let effects = g.effects.clone();
+            for (clip, var, snd) in objs {
+                self.new_sound_obj(clip, var, effects.clone(), snd, 100.0);
+            }
         } else {
             self.world.latch();
             self.world.advance(&mut self.host);
@@ -1088,6 +1096,10 @@ impl Ui {
                         g.finish_ticks = tick_len(&player, n);
                     }
                 }
+            }
+            Sfx::PlayerLoops(n, loops) => {
+                let vol = if n == "hurt" { 0.5 } else { 1.0 };
+                self.play_named(&player, n, loops, vol);
             }
             Sfx::PlayerStop(n) => {
                 if n == "steps" {
