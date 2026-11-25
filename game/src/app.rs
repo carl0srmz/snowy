@@ -112,12 +112,17 @@ pub fn run(opt: Options) -> Result<()> {
     let mut acc = 0.0f64;
     let mut last = Instant::now();
     let started = Instant::now();
+    let resize_test = std::env::var("SNOWDRIFT_RESIZE_TEST").is_ok();
+    let mut frame_no = 0u64;
     'main: loop {
-        let vp = render::fit_viewport(config.width, config.height, STAGE_W, STAGE_H);
-        let (ww, wh) = window.size();
-        let (sx, sy) = (config.width as f32 / ww.max(1) as f32, config.height as f32 / wh.max(1) as f32);
-        let to_stage = |x: i32, y: i32| ((x as f32 * sx - vp[0]) / vp[2] * STAGE_W, (y as f32 * sy - vp[1]) / vp[3] * STAGE_H);
         for e in events.poll_iter() {
+            // window -> stage coordinates with the swapchain size as it is right now
+            let to_stage = |x: i32, y: i32| {
+                let vp = render::fit_viewport(config.width, config.height, STAGE_W, STAGE_H);
+                let (ww, wh) = window.size();
+                let (sx, sy) = (config.width as f32 / ww.max(1) as f32, config.height as f32 / wh.max(1) as f32);
+                ((x as f32 * sx - vp[0]) / vp[2].max(1.0) * STAGE_W, (y as f32 * sy - vp[1]) / vp[3].max(1.0) * STAGE_H)
+            };
             use sdl2::event::{Event, WindowEvent};
             use sdl2::keyboard::Keycode as K;
             match e {
@@ -162,11 +167,7 @@ pub fn run(opt: Options) -> Result<()> {
                 Event::MouseButtonUp { mouse_btn: sdl2::mouse::MouseButton::Left, .. } => ui.mouse_released(),
                 Event::MouseWheel { y, .. } => ui.wheel(y),
                 Event::Window { win_event: WindowEvent::SizeChanged(..) | WindowEvent::Resized(..), .. } => {
-                    let (w, h) = window.drawable_size();
-                    config.width = w.max(1);
-                    config.height = h.max(1);
-                    surface.configure(&ui.rd.device, &config);
-                    target = Target::new(&ui.rd.device, config.width, config.height, format);
+                    // handled below, right before drawing (also catches size changes without an event)
                 }
                 _ => {}
             }
@@ -204,6 +205,33 @@ pub fn run(opt: Options) -> Result<()> {
                 break;
             }
         }
+        // dev: stress window resizing (SNOWDRIFT_RESIZE_TEST)
+        if resize_test {
+            frame_no += 1;
+            if frame_no % 3 == 0 {
+                let sizes = [(1170u32, 715u32), (1143, 717), (640, 411), (1281, 777), (451, 290), (900, 578), (1919, 1003), (333, 999)];
+                let (w, h) = sizes[(frame_no / 3) as usize % sizes.len()];
+                let _ = window.set_size(w, h);
+                if frame_no % 40 == 0 {
+                    let fs = window.fullscreen_state();
+                    let _ = window.set_fullscreen(if fs == sdl2::video::FullscreenType::Off { sdl2::video::FullscreenType::Desktop } else { sdl2::video::FullscreenType::Off });
+                }
+            }
+        }
+        // keep the swapchain and the render target at the window's drawable size
+        let (dw, dh) = window.drawable_size();
+        if dw == 0 || dh == 0 {
+            // minimised: nothing to draw into
+            std::thread::sleep(std::time::Duration::from_millis(16));
+            continue;
+        }
+        if dw != config.width || dh != config.height {
+            config.width = dw;
+            config.height = dh;
+            surface.configure(&ui.rd.device, &config);
+            target = Target::new(&ui.rd.device, config.width, config.height, format);
+        }
+        let vp = render::fit_viewport(config.width, config.height, STAGE_W, STAGE_H);
         let frame = match surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(f) | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
             _ => {

@@ -558,11 +558,11 @@ impl Renderer {
             let mut slot = 0u64;
             for li in 0..self.layers.len() {
                 let fx = self.fx.as_ref().unwrap();
-                self.run_pass(encoder, "layer", &self.layers[li].cmds, &fx.msaa.msaa_view, &fx.msaa.resolve_view, &fx.msaa.stencil_view, Some(wgpu::Color::TRANSPARENT), viewport, fmt);
+                self.run_pass(encoder, "layer", &self.layers[li].cmds, &fx.msaa.msaa_view, &fx.msaa.resolve_view, &fx.msaa.stencil_view, Some(wgpu::Color::TRANSPARENT), viewport, fmt, (target.width, target.height));
                 self.run_filters(encoder, li, target.width, target.height, scale, &mut slot);
             }
         }
-        self.run_pass(encoder, "scene", &self.cmds, &target.msaa_view, resolve.unwrap_or(&target.resolve_view), &target.stencil_view, clear, viewport, fmt);
+        self.run_pass(encoder, "scene", &self.cmds, &target.msaa_view, resolve.unwrap_or(&target.resolve_view), &target.stencil_view, clear, viewport, fmt, (target.width, target.height));
     }
 
     fn run_pass(
@@ -576,6 +576,7 @@ impl Renderer {
         clear: Option<wgpu::Color>,
         viewport: [f32; 4],
         fmt: wgpu::TextureFormat,
+        size: (u32, u32),
     ) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some(label),
@@ -600,15 +601,34 @@ impl Renderer {
             occlusion_query_set: None,
             multiview_mask: None,
         });
-        pass.set_viewport(viewport[0], viewport[1], viewport[2], viewport[3], 0.0, 1.0);
-        pass.set_scissor_rect(viewport[0] as u32, viewport[1] as u32, viewport[2] as u32, viewport[3] as u32);
+        // viewport and scissor must lie inside the target (a stale size after a window resize
+        // would otherwise be a validation error)
+        let (tw, th) = (size.0 as f32, size.1 as f32);
+        let x0 = viewport[0].clamp(0.0, tw);
+        let y0 = viewport[1].clamp(0.0, th);
+        let vw = viewport[2].min(tw - x0);
+        let vh = viewport[3].min(th - y0);
+        if vw < 1.0 || vh < 1.0 {
+            return;
+        }
+        let clip_rect = |r: [u32; 4]| -> [u32; 4] {
+            let x = r[0].min(size.0);
+            let y = r[1].min(size.1);
+            [x, y, r[2].min(size.0 - x), r[3].min(size.1 - y)]
+        };
+        let full = clip_rect([x0 as u32, y0 as u32, vw as u32, vh as u32]);
+        pass.set_viewport(x0, y0, vw, vh, 0.0, 1.0);
+        pass.set_scissor_rect(full[0], full[1], full[2], full[3]);
         pass.set_bind_group(0, self.draw_bind.as_ref(), &[]);
         let tb = self.t_bufs.as_ref().unwrap();
         for c in cmds {
             match c {
                 Cmd::Scissor(r) => match r {
-                    Some(r) => pass.set_scissor_rect(r[0], r[1], r[2], r[3]),
-                    None => pass.set_scissor_rect(viewport[0] as u32, viewport[1] as u32, viewport[2] as u32, viewport[3] as u32),
+                    Some(r) => {
+                        let r = clip_rect(*r);
+                        pass.set_scissor_rect(r[0], r[1], r[2], r[3]);
+                    }
+                    None => pass.set_scissor_rect(full[0], full[1], full[2], full[3]),
                 },
                 Cmd::Draw { buf, vbyte, ibyte, icount, inst, tex, blend, stencil, sref, layer } => {
                     if *icount == 0 {
