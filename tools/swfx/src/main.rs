@@ -4,6 +4,7 @@ mod behaviors;
 mod bitmaps;
 mod convert;
 mod decomp;
+mod devfont;
 mod dis;
 mod morph;
 mod scripts;
@@ -95,6 +96,19 @@ fn cmd_convert(root: &Path, out: &Path) {
         })
         .flatten()
         .collect();
+    // the system font for text fields without embedded outlines
+    let font_path = env::var("SWFX_DEVICE_FONT").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("fonts/DejaVuSans.ttf"));
+    match fs::read(&font_path).map_err(anyhow::Error::from).and_then(|d| devfont::build("_sans", &d)) {
+        Ok(f) => {
+            let mut lib = snow_fmt::Library { name: "device".into(), ..Default::default() };
+            println!("{:<34} {:>4} glyphs", "device font", f.glyphs.len());
+            lib.fonts.insert(1, f);
+            let dir = out.join("device");
+            fs::create_dir_all(&dir).unwrap();
+            lib.save(&dir.join("lib.bin")).unwrap();
+        }
+        Err(e) => eprintln!("device font {}: {:#} (device text will use an embedded face)", font_path.display(), e),
+    }
     if !unknown.is_empty() {
         println!("\n{} native behaviours referenced (see scripts_index.txt)", unknown.len());
         let _ = fs::create_dir_all(out);

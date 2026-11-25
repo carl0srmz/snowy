@@ -113,9 +113,16 @@ early, which made the jump four times too low and shifted every `cnt-- == 0` tim
 Developer drivers: `snowdrift ui <assets> <repo> --script "tick:60;click:x,y;shot:out.png;..."`,
 `snowdrift level <assets> <repo> N --script ...`, `snowdrift shot`, `snowdrift tree`.
 
+## Third-party files
+
+`fonts/DejaVuSans.ttf` (Bitstream Vera / DejaVu licence, see `fonts/DejaVuSans-LICENSE.txt`) stands
+in for the one system font the game asks for (Verdana, in the terms of use); the converter turns
+it into the same glyph format as the embedded SWF fonts.
+
 ## Deliberate deviations from the Flash original
 
 * The lab's invisible blocker button stays disabled (it only existed to swallow clicks while
   loading).
 * Online-only features (feedback upload, external links) save locally / open in the system browser.
 * Vector art is rendered at the window resolution instead of the SWF's fixed 900x578 raster.
+* The terms of use use DejaVu Sans (with Verdana's line metrics) instead of Verdana.

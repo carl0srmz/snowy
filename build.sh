@@ -177,7 +177,7 @@ run cargo build --release
 BIN="${CARGO_TARGET_DIR:-target}/release"
 
 # the assets depend on the converter: redo them whenever its source changed
-STAMP="$(cat tools/swfx/src/*.rs crates/fmt/src/*.rs | cksum | cut -d' ' -f1)"
+STAMP="$(cat tools/swfx/src/*.rs crates/fmt/src/*.rs fonts/*.ttf 2>/dev/null | cksum | cut -d' ' -f1)"
 if [ "$RECONVERT" = 1 ] || [ ! -f assets/scripts_index.txt ] || [ "$(cat assets/.converter 2>/dev/null)" != "$STAMP" ]; then
   say "converting the original Flash data into native assets (about 1 minute on many cores)"
   run rm -rf assets

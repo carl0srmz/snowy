@@ -1509,6 +1509,7 @@ dependencies = [
  "env_logger",
  "ffmpeg-next",
  "image",
+ "libc",
  "log",
  "pollster",
  "raw-window-handle",
@@ -1569,6 +1570,7 @@ dependencies = [
  "snow_fmt",
  "swf",
  "symphonia",
+ "ttf-parser",
 ]
 
 [[package]]
@@ -1734,6 +1736,12 @@ checksum = "b52fd3255258d26fac7264ab5a76b53c13367136dc011d3d6ad4f8ed070396a3"
 dependencies = [
  "pin-project-lite",
 ]
+
+[[package]]
+name = "ttf-parser"
+version = "0.25.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2df906b07856748fa3f6e0ad0cbaa047052d4a7dd609e231c4f72cee8c36f31"
 
 [[package]]
 name = "unicode-ident"

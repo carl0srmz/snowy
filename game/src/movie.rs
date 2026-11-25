@@ -133,6 +133,8 @@ pub struct SoundEvent {
 
 pub struct World {
     pub libs: Vec<Arc<GpuLib>>,
+    /// the system font for text fields without embedded outlines (assets/device)
+    pub device_font: Option<snow_fmt::FontDef>,
     pub clips: Vec<Option<Clip>>,
     free: Vec<u32>,
     pub root: ClipId,
@@ -160,6 +162,7 @@ impl World {
     pub fn new() -> World {
         let mut w = World {
             libs: Vec::new(),
+            device_font: None,
             clips: Vec::new(),
             free: Vec::new(),
             root: NONE,
@@ -316,6 +319,9 @@ impl World {
                     if let Some(p) = self.clip_mut(id) {
                         p.children.insert(key, cc);
                     }
+                    // state sprites get their first frame right away (a one-frame sprite would
+                    // otherwise never be entered and stay empty)
+                    self.on_create(cc, host);
                 }
             }
         }
@@ -927,8 +933,11 @@ impl World {
                 // `load` events fire once, right after the clip exists with its first frame
                 let events: Vec<ClipEvent> = self.clip(id).map(|c| c.events.clone()).unwrap_or_default();
                 if cur == 0 {
-                    for e in events.iter().filter(|e| e.flags & clip_event::LOAD != 0) {
-                        self.exec_ops(id, &e.ops, host);
+                    // construct (component parameters) and initialize run before load
+                    for flag in [clip_event::CONSTRUCT, clip_event::INITIALIZE, clip_event::LOAD] {
+                        for e in events.iter().filter(|e| e.flags & flag != 0) {
+                            self.exec_ops(id, &e.ops, host);
+                        }
                     }
                 }
             }

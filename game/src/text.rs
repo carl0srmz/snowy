@@ -9,6 +9,8 @@ pub struct Fmt {
     pub size: f32,
     pub color: [f32; 4],
     pub letter_spacing: f32,
+    /// <u>: underlined (spaces included, like Flash)
+    pub underline: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -49,7 +51,7 @@ pub struct TextField {
 }
 
 fn base_fmt(def: &EditTextDef) -> Fmt {
-    Fmt { size: def.size, color: def.color, letter_spacing: 0.0 }
+    Fmt { size: def.size, color: def.color, letter_spacing: 0.0, underline: false }
 }
 
 impl TextField {
@@ -156,6 +158,12 @@ impl TextField {
         *self.layout.borrow_mut() = None;
     }
 
+    /// Lines that fit into the field (bottomScroll - scroll + 1 for a full page).
+    pub fn visible_line_count(&self, world: &World) -> usize {
+        self.ensure_layout(world);
+        self.layout.borrow().as_ref().map(|l| l.visible_lines).unwrap_or(1)
+    }
+
     pub fn max_scroll(&self, world: &World) -> u32 {
         self.ensure_layout(world);
         let l = self.layout.borrow();
@@ -171,6 +179,11 @@ impl TextField {
 
     fn font<'a>(&self, world: &'a World) -> Option<&'a FontDef> {
         let lib = &world.libs[self.lib as usize].lib;
+        if self.def.device {
+            if let Some(f) = &world.device_font {
+                return Some(f);
+            }
+        }
         if let Some(id) = self.def.font {
             if let Some(f) = lib.fonts.get(&id) {
                 if !f.glyphs.is_empty() {
@@ -210,7 +223,9 @@ impl TextField {
         let mut y = b.y0 + gutter;
         let mut line_idx = 0usize;
         let visible_height = b.height() - gutter * 2.0;
-        let line_h = |size: f32| (font.ascent + font.descent + font.leading) * size + self.def.leading;
+        // Flash advances lines by ascent + descent + the TextFormat leading (the font record's own
+        // leading field is not used for layout)
+        let line_h = |size: f32| (font.ascent + font.descent) * size + self.def.leading;
         let mut groups: Vec<Group> = Vec::new();
         let skip_lines = (self.scroll.max(1) - 1) as usize;
         let mut cur_visible = 0usize;
@@ -282,6 +297,7 @@ impl TextField {
                     }
                     let baseline = y + font.ascent * size;
                     for t in &line {
+                        let x_start = x;
                         for c in t.text.chars() {
                             let g = glyph_of(c);
                             if let Some(g) = g {
@@ -299,6 +315,20 @@ impl TextField {
                                 }
                             }
                             x += g.map(|g| g.advance * t.fmt.size).unwrap_or(0.35 * t.fmt.size) + t.fmt.letter_spacing;
+                        }
+                        if t.fmt.underline && x > x_start {
+                            // a one-pixel rule just under the baseline
+                            let (y0, y1) = (baseline + (t.fmt.size * 0.12).max(1.0), baseline + (t.fmt.size * 0.12).max(1.0) + 1.0);
+                            let grp = match groups.iter_mut().find(|g| g.color == t.fmt.color) {
+                                Some(gp) => gp,
+                                None => {
+                                    groups.push(Group { color: t.fmt.color, verts: vec![], idx: vec![] });
+                                    groups.last_mut().unwrap()
+                                }
+                            };
+                            let base = grp.verts.len() as u32;
+                            grp.verts.extend([[x_start, y0], [x, y0], [x, y1], [x_start, y1]]);
+                            grp.idx.extend([0, 1, 2, 0, 2, 3].iter().map(|i| i + base));
                         }
                     }
                     y += lh;
@@ -400,10 +430,15 @@ fn parse_html(html: &str, base: &Fmt, align: Align) -> Vec<Para> {
                         }
                         fmt_stack.push(f);
                     }
-                    ("font", true) => {
+                    ("font", true) | ("u", true) => {
                         if fmt_stack.len() > 1 {
                             fmt_stack.pop();
                         }
+                    }
+                    ("u", false) => {
+                        let mut f = fmt_stack.last().unwrap().clone();
+                        f.underline = true;
+                        fmt_stack.push(f);
                     }
                     _ => {}
                 }

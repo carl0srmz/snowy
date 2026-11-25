@@ -5,6 +5,7 @@ edition = "2021"
 description = "Mission in Snowdriftland - native port"
 
 [dependencies]
+libc = "0.2"
 snow_fmt = { path = "../crates/fmt" }
 anyhow = "1"
 log = "0.4"

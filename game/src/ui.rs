@@ -100,6 +100,7 @@ pub struct Ui {
     pub hover: ClipId,
     pub pressed: ClipId,
     pub mouse: (f32, f32),
+    pub scrollbars: Vec<crate::scrollbar::ScrollBar>,
     pub wm: XmlValues,
     pub help: XmlValues,
     pub gamelevel: XmlValues,
@@ -155,6 +156,7 @@ impl Ui {
             hover: NONE,
             pressed: NONE,
             mouse: (-1.0, -1.0),
+            scrollbars: Vec::new(),
             wm: XmlValues::default(),
             help: XmlValues::default(),
             gamelevel: XmlValues::default(),
@@ -190,6 +192,8 @@ impl Ui {
             last_download: None,
             assets,
         };
+        // the system font for device-text fields (converted by swfx from fonts/DejaVuSans.ttf)
+        ui.world.device_font = snow_fmt::Library::load(&ui.assets.join("device/lib.bin")).ok().and_then(|l| l.fonts.into_values().next());
         ui.boot()?;
         Ok(ui)
     }
@@ -429,6 +433,7 @@ impl Ui {
         self.set_html("help.hinweis_txt", &hint, None);
         self.init_feedback();
         self.init_buttons();
+        self.build_scrollbars();
         self.upixo_visited();
         self.set_visible("worldmap", true);
         self.set_date();
@@ -442,18 +447,11 @@ impl Ui {
         self.save.visited();
     }
 
+    /// Worldmap.setCurrentdate: the date server (date.php) is gone, so like the original offline
+    /// fallback this is the local date plus 432000 s (five days).
     fn set_date(&mut self) {
-        let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
-        let z = secs.div_euclid(86400) + 719468;
-        let era = z.div_euclid(146097);
-        let doe = z.rem_euclid(146097);
-        let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-        let y = yoe + era * 400;
-        let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-        let mp = (5 * doy + 2) / 153;
-        let d = doy - (153 * mp + 2) / 5 + 1;
-        let m = if mp < 10 { mp + 3 } else { mp - 9 };
-        let y = if m <= 2 { y + 1 } else { y };
+        let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0) + 432000;
+        let (d, m, y) = local_date(secs);
         self.set_text("worldmap.date_txt", &format!("{:02}.{:02}.{}", d, m, y), Some(0.5));
     }
 
@@ -1008,6 +1006,7 @@ impl Ui {
         self.host.inits.clear();
         self.host.finish = false;
         self.step_tickers();
+        self.scrollbars_tick();
         self.dispatch();
         self.game_flow();
         self.drain_sound_events();
@@ -1206,3 +1205,26 @@ impl Ui {
 }
 
 pub fn _unused(_: TexId) {}
+
+/// (day, month, year) of a Unix time in the local time zone.
+pub fn local_date(secs: i64) -> (i64, i64, i64) {
+    #[cfg(unix)]
+    unsafe {
+        let t: libc::time_t = secs as libc::time_t;
+        let mut tm: libc::tm = std::mem::zeroed();
+        if !libc::localtime_r(&t, &mut tm).is_null() {
+            return (tm.tm_mday as i64, tm.tm_mon as i64 + 1, tm.tm_year as i64 + 1900);
+        }
+    }
+    // civil date from days (UTC)
+    let z = secs.div_euclid(86400) + 719468;
+    let era = z.div_euclid(146097);
+    let doe = z.rem_euclid(146097);
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    (d, m, if m <= 2 { y + 1 } else { y })
+}

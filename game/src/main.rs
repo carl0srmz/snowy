@@ -6,6 +6,7 @@ mod lab;
 mod intro;
 mod level;
 mod scripts;
+mod scrollbar;
 mod ui;
 mod video;
 mod save;

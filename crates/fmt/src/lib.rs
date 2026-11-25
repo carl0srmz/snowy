@@ -226,6 +226,8 @@ pub struct EditTextDef {
     pub auto_size: bool,
     pub border: bool,
     pub max_length: u16,
+    /// no embedded outlines: Flash draws it with a system font
+    pub device: bool,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
@@ -338,6 +340,8 @@ pub mod clip_event {
     pub const INITIALIZE: u32 = 1 << 9;
     pub const PRESS: u32 = 1 << 10;
     pub const RELEASE: u32 = 1 << 11;
+    /// onClipEvent(construct): component parameters, before the clip's first frame
+    pub const CONSTRUCT: u32 = 1 << 12;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

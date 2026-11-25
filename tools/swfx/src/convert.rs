@@ -86,6 +86,7 @@ fn clip_flags(f: swf::ClipEventFlag) -> u32 {
         (C::INITIALIZE, clip_event::INITIALIZE),
         (C::PRESS, clip_event::PRESS),
         (C::RELEASE, clip_event::RELEASE),
+        (C::CONSTRUCT, clip_event::CONSTRUCT),
     ];
     for (a, b) in map {
         if f.contains(a) {
@@ -389,6 +390,7 @@ pub fn convert(name: &str, data: &[u8]) -> Result<Converted> {
                         auto_size: e.is_auto_size(),
                         border: e.has_border(),
                         max_length: e.max_length().unwrap_or(0),
+                        device: !e.use_outlines(),
                     }),
                 );
             }
