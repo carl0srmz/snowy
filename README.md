@@ -1,4 +1,4 @@
-# Mission in Snowdriftland, native
+# Mission in Snowdriftland native port
 
 ![The world map with the first nine doors opened](docs/screenshots/world-map.png)
 
