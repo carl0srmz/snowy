@@ -1,128 +1,182 @@
-# Mission in Snowdriftland: native port
+# Mission in Snowdriftland, native
 
-A native (Rust) port of the Flash game. No Ruffle, no browser, no WebView, no script VM. The
-original `.swf` files are converted once into plain native data (`assets/`), and all game
-and menu logic is re-implemented in Rust from the recovered original ActionScript.
+![The world map with the first nine doors opened](docs/screenshots/world-map.png)
 
-Everything in the original is included: intro, world map with the 25 doors, all 25 levels, every
-enemy and the El Pix boss, hearts/crystals/heart containers, save data, help / feedback /
-impressum / credits, the laboratory with its promo info texts, screenshots, FLV videos and
-downloads, and the four languages (English, German, French, Dutch).
+Mission in Snowdriftland is a Flash game that Nintendo and Extra Toxic put online as an advent
+calendar in December 2006. Every day from the 1st to the 24th a door opened on a new platform
+level, and a 25th door led to the fight against the penguin El Pix. Between levels you could visit
+a laboratory with trailers, screenshots and downloads for the Nintendo DS and Wii games of the time.
 
-## Build and run
+Browsers dropped Flash at the end of 2020, so today the game only runs there inside an emulator
+such as Ruffle. This repository runs it as a normal desktop program instead. It reads the original
+`.swf` files, converts them once into its own format, and plays them with an engine written in
+Rust. There is no Flash player or emulator inside: the game logic was rewritten by hand from the
+decompiled ActionScript and checked against the original bytecode.
+
+| | |
+|---|---|
+| ![Level 3](docs/screenshots/level-3.png) | ![The laboratory](docs/screenshots/lab.png) |
+| ![The intro](docs/screenshots/intro.png) | |
+
+## Quick start
 
 ```bash
-git clone https://github.com/carl0srmz/snowy && cd snowy
+git clone https://github.com/carl0srmz/snowy
+cd snowy
 ./build.sh --run
 ```
 
-`build.sh` sets up everything and is safe to re-run (finished steps are skipped):
+The first run takes a few minutes. `build.sh` does the following and skips whatever is already
+done:
 
-1. installs missing system packages (compiler, pkg-config, git, libclang, SDL2, FFmpeg dev libs) with
-   `apt`, `dnf`, `pacman`, `zypper` or Homebrew (it only calls `sudo` when something is missing)
-2. installs Rust via rustup when `cargo` is missing
-3. fetches the original game files into `./original` (a read-only clone of
-   https://github.com/NinjaAdam/Mission-in-Snowdriftland; this repo contains only the port)
-4. converts the original SWFs into native assets in `./assets` (about a minute)
-5. builds the game in release mode
+1. Installs missing system packages with `apt`, `dnf`, `pacman`, `zypper` or Homebrew. It asks for
+   your password through `sudo` only if something is missing.
+2. Installs Rust with rustup if `cargo` isn't found.
+3. Downloads the original game files from
+   [NinjaAdam/Mission-in-Snowdriftland](https://github.com/NinjaAdam/Mission-in-Snowdriftland)
+   into `original/`. They are not part of this repository.
+4. Converts the Flash files into `assets/`. This takes about a minute and happens again
+   automatically when the converter changes.
+5. Builds the game and, with `--run`, starts it.
 
-Options: `--run` start the game afterwards, `--no-install` only check and report (never install),
-`--reconvert` redo the asset conversion, `--dry-run` print what would happen. `ORIGINAL=<dir>` uses
-an existing checkout of the original files instead of `./original`.
-
-You need a GPU/driver with Vulkan, Metal or DX12. Then, to start later:
+After that, start the game with:
 
 ```bash
 ./target/release/snowdrift --assets assets --data original
 ```
 
-`--data` is the folder holding the original game files (the promo downloads, videos and
-screenshots are read from `data/` there; they are not duplicated into `assets/`).
+Other `build.sh` options: `--no-install` only reports what's missing, `--reconvert` forces a new
+asset conversion, `--dry-run` prints the steps without running them. Set `ORIGINAL=/some/path` to
+use a copy of the original files that you already have.
 
-| Option | Meaning |
+## Requirements
+
+- Linux or macOS. Windows isn't supported by `build.sh` yet; the code itself has no Linux-only
+  parts, but nobody has built it there.
+- A graphics driver with Vulkan (Linux), Metal (macOS) or Direct3D 12 (Windows).
+- About 2 GB of disk space. Most of it is Rust's build cache in `target/`; the original files
+  and the converted assets together take under 300 MB.
+
+The game has only been tested on Linux so far.
+
+## Playing
+
+The mouse works the menus, the world map and the laboratory. Click a door to play its level.
+
+| Key | In a level |
 |---|---|
-| `--lang en\|de\|fr\|nl` | language (default: system language) |
-| `--level N` | jump straight into level 1-25 (the world map is skipped) |
-| `--fullscreen` | start fullscreen (`F11` / `Alt+Enter` toggles at any time) |
-| `--mute` | no audio |
-| `--unlock-all` | open every door (for testing, does not touch your save) |
-| `--debug` | show the original's hidden debug "cookie" button on the world map |
-| `--seconds N` | quit after N seconds (smoke tests) |
+| Left / Right, or A / D | Walk. Hold to start running. |
+| Up, W or Space | Jump. Hold for a higher jump. Climbs up ladders. |
+| Down or S | Crouch. Climbs down ladders. |
+| Esc | Back to the world map. On the world map, quit. |
+| F11 or Alt+Enter | Toggle fullscreen. |
 
-Controls: the mouse drives all menus and the world map. In a level: arrows / `WASD` / `Space`
-move and jump. `Esc` goes back to the world map (and quits from the world map); in the lab it
-closes the lab. Gamepad: D-pad or left stick to move, `A`/`B` to jump.
+A game controller works too: D-pad or left stick to move, A or B to jump.
 
-Save data (intro seen, visited doors, hearts containers, laboratory unlocks) is a small JSON file in
-`$SNOWDRIFT_DATA`, else `$XDG_DATA_HOME/snowdrift`, `%APPDATA%\snowdrift` or
-`~/.local/share/snowdrift`. Downloads from the lab are copied to `~/Downloads`. Feedback written in
-the feedback form is stored locally as `feedback.txt` next to the save file (the original posted it
-to a web server that no longer exists).
+Command-line options:
 
-## Layout
-
-| Path | What |
+| Option | What it does |
 |---|---|
-| `crates/fmt` | native asset format (tessellated vector meshes, timelines, text, sounds) |
-| `tools/swfx` | converter + developer tools (`convert`, `dec` AVM1 decompiler, `info`, `dis`, `features`) |
-| `game` | the game: wgpu renderer, display tree, text engine, audio, video, levels, UI, window |
-| `docs/decompiled` | readable decompilation of the original ActionScript (reference for the port) |
+| `--lang en`, `de`, `fr` or `nl` | Language. Without it, the language comes from `SNOWDRIFT_LANG`, `LC_ALL` or `LANG`, and falls back to English. |
+| `--level N` | Start level N (1 to 25) directly. |
+| `--fullscreen` | Start in fullscreen. |
+| `--mute` | No sound. |
+| `--unlock-all` | Mark every door as played. This writes to your save file. |
+| `--debug` | Show the original's hidden test button on the world map. |
+| `--seconds N` | Quit after N seconds. Useful for scripted tests. |
 
-## How it uses the hardware
+### Saves and files
 
-* **GPU**: all art is converted to triangle meshes (lyon) and drawn with wgpu (Vulkan / Metal / DX12)
-  with 4x MSAA, gradient/bitmap fills in shaders, stencil-buffer masks, and vector art that stays
-  sharp at any resolution or fullscreen. Draw parameters are batched in one storage buffer.
-  Display-list filters (the intro's blur and colour-matrix effects) run as offscreen GPU passes.
-* **CPU**: converter and bitmap decoding run on all cores (rayon); video decoding runs on its own
-  thread (FFmpeg, VP6/FLV); logic runs at the original fixed 34 Hz and rendering is interpolated at
-  the display refresh rate (vsync), so scrolling is smooth on 60/144 Hz screens.
-* **Audio**: SDL2 callback mixer. The converter decodes every sound once (MP3 with Symphonia,
-  ADPCM natively; both checked sample-exact against FFmpeg) and trims it like Flash (MP3 encoder
-  delay skipped, exact sample count, so loops are seamless). At load time sounds are resampled
-  to the device rate with a band-limited windowed-sinc filter (multi-core), so 11/22 kHz effects
-  keep their treble. Video audio is decoded the same way and used as the video's clock.
-* **Input**: keyboard, mouse and gamepads (SDL2 game controller API).
+Progress is saved to `save.json` in the first of these folders that applies:
+`$SNOWDRIFT_DATA`, `$XDG_DATA_HOME/snowdrift`, `%APPDATA%\snowdrift`,
+`~/Library/Application Support/snowdrift` on macOS, or `~/.local/share/snowdrift`.
 
-## What the port is made of
+Downloads from the laboratory are copied to your `Downloads` folder. Messages sent with the
+feedback form are appended to `feedback.txt` next to the save file, because the server the original
+posted them to no longer exists.
 
-* a converter for all 45 SWFs: vector art, gradients, bitmaps (JPEG/lossless/alpha), morph shapes,
-  fonts, static and dynamic text, buttons with their actions, timelines, filters, sounds
-  (MP3/ADPCM -> PCM)
-* a Flash-semantics display tree (depths, names, labels, play/stop/goto, attachMovie, clip events,
-  masks) that runs the original timelines unchanged
-* a port of the `gamestart.swf` engine: tile streaming, scrolling camera, character physics,
-  collision, hero rules, pickups, moving platforms, every enemy type (Pinku, Speedy, Tree, Mom,
-  Joggybear with iceballs, Pinku stacks, spiders, Snow Spider, eagle, runner, web) and the El Pix
-  boss fight
-* a port of the UI classes (Control, Worldmap, Upixo, Lab, Ticker, SoundFile) and the 31 complex
-  timeline scripts (`docs/decompiled/script_behaviours_index.txt`)
+## Differences from the original
 
-## Verification
+These are intentional:
 
-Run headlessly against the real data: all 25 levels run through the full UI path without errors
-(movement scripts, enemies, goal), the boss fight (arena, ship entrance, thrown Pinkus, hearts), the
-world map with played/open/closed doors, the lab (list, greeting tickers, info with artwork,
-screenshots with counter, FLV video playback), help / feedback / impressum / credits, the intro
-(play and skip, with its filters), all four languages, and a windowed run under Xvfb.
+- The calendar date. The original asked a server for the date and, when that failed, used your
+  computer's date plus five days. The server is gone, so the port always does the second thing.
+  Like the original, all 24 doors are open regardless of the date.
+- The terms of use are set in DejaVu Sans with Verdana's line spacing, because Verdana can't be
+  shipped with the game. It's the only text in the game that used a system font.
+- Vector graphics are drawn at your screen's resolution instead of the original 900 x 578, so they
+  stay sharp in fullscreen.
+- Links open in your web browser, and downloads are saved to disk instead of opening a browser tab.
 
-Gameplay rules are checked against the original bytecode, not just the decompiled text: the
-decompiler keeps `x++`/`x--` used inside expressions as post-increments (it used to apply them
-early, which made the jump four times too low and shifted every `cnt-- == 0` timer by one frame).
+Known issues:
 
-Developer drivers: `snowdrift ui <assets> <repo> --script "tick:60;click:x,y;shot:out.png;..."`,
-`snowdrift level <assets> <repo> N --script ...`, `snowdrift shot`, `snowdrift tree`.
+- In one paragraph of the help page a word wraps one line earlier than in Flash.
+- The end-of-level report and the laboratory with unlocked games haven't been compared
+  side by side with the original yet.
 
-## Third-party files
+If you find something that behaves differently from the Flash version, please open an issue and say
+which level or screen it is.
 
-`fonts/DejaVuSans.ttf` (Bitstream Vera / DejaVu licence, see `fonts/DejaVuSans-LICENSE.txt`) stands
-in for the one system font the game asks for (Verdana, in the terms of use); the converter turns
-it into the same glyph format as the embedded SWF fonts.
+## Troubleshooting
 
-## Deliberate deviations from the Flash original
+`build.sh` stops with "missing build dependencies": your package manager isn't one of the five it
+knows, or the install failed. Install the packages it lists (a C compiler, pkg-config, libclang,
+and the SDL2 and FFmpeg development packages) and run it again. If libclang is installed somewhere
+unusual, point `LIBCLANG_PATH` at the folder that contains `libclang.so`.
 
-* The lab's invisible blocker button stays disabled (it only existed to swallow clicks while
-  loading).
-* Online-only features (feedback upload, external links) save locally / open in the system browser.
-* Vector art is rendered at the window resolution instead of the SWF's fixed 900x578 raster.
-* The terms of use use DejaVu Sans (with Verdana's line metrics) instead of Verdana.
+The game exits with "no suitable GPU": install or update the Vulkan driver for your graphics card.
+On Linux, `vulkaninfo` (from the `vulkan-tools` package) shows whether one is found.
+
+There is no sound: the game uses SDL2's default audio device. Check that other programs can play
+sound, or start the game with `--mute` to silence the warning.
+
+## How it works
+
+The converter (`tools/swfx`) turns every shape into triangle meshes and decodes every sound and
+bitmap ahead of time. The game (`game/`) recreates Flash's display list, so the original
+animations and most frame scripts run as they did. Everything the scripts did beyond that, such as
+the physics, enemies, world map, laboratory and intro, is written out in Rust.
+[docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) goes into the details.
+
+## Development
+
+| Path | Contents |
+|---|---|
+| `tools/swfx` | The converter, plus tools for reading SWF files: `dis` (disassembler), `dec` (decompiler), `info`, `tags`. |
+| `crates/fmt` | The asset format shared by the converter and the game. |
+| `game` | The game: renderer, display list, text, audio, video, levels, menus. |
+| `docs/decompiled` | The original ActionScript, decompiled. The port follows it. |
+| `fonts` | DejaVu Sans, used for the terms of use. |
+
+```bash
+cargo build --release
+cargo test --release
+```
+
+`snowdrift ui` and `snowdrift level` run the game without a window and take a script of inputs and
+screenshots, which is how most of the port was checked:
+
+```bash
+./target/release/snowdrift level assets original 3 --script "R:60,RU:20,R:40" --shot level3.png
+```
+
+```bash
+SNOWDRIFT_DATA=/tmp/snowdrift-test ./target/release/snowdrift ui assets original --unlock 3 --script "tick:60;click:348,450;tick:200;shot:out.png"
+```
+
+The first walks right in level 3, jumps once and saves a screenshot. The second clicks the first
+door on the world map and takes a screenshot of the level. `--unlock N` skips the intro and marks
+the first N doors as played. It writes to the save file, so the example points `SNOWDRIFT_DATA` at a
+throwaway folder.
+
+Setting `TRACE=1` prints the hero's position and physics state every frame in `level` mode.
+
+## Credits and license
+
+Mission in Snowdriftland was made by Extra Toxic for Nintendo. The game, its characters, graphics,
+music and texts belong to them. None of the original files are stored in this repository; the
+build script downloads them from NinjaAdam's archive.
+
+DejaVu Sans is covered by the Bitstream Vera and DejaVu license in `fonts/DejaVuSans-LICENSE.txt`.
+
+The code in this repository doesn't have a license yet.
