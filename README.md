@@ -184,7 +184,7 @@ throwaway folder.
 
 Setting `TRACE=1` prints the hero's position and physics state every frame in `level` mode.
 
-## Credits and license
+## Credits
 
 Mission in Snowdriftland was made by Extra Toxic for Nintendo. The game, its characters, graphics,
 music and texts belong to them. None of the original files are stored in this repository; the
@@ -192,4 +192,20 @@ build script downloads them from NinjaAdam's archive.
 
 DejaVu Sans is covered by the Bitstream Vera and DejaVu license in `fonts/DejaVuSans-LICENSE.txt`.
 
-The code in this repository doesn't have a license yet.
+## License
+
+[MIT](LICENSE) for the game, the converter and the build script. `docs/decompiled` is decompiled
+from the original game and isn't covered; neither is anything downloaded or converted from the
+original files (`original/` and `assets/`).
+
+**Unofficial fan project and intellectual property notice**
+
+This is an independent, unofficial software project. It is not affiliated with, endorsed by, or sponsored by Nintendo or Extra Toxic.
+
+Mission in Snowdriftland and all associated trademarks and copyrighted game content belong to their respective rights holders. Any gameplay screenshots included in this README are used to document and compare technical features of the software.
+
+No original game files are distributed with this project. The build script downloads them from a separate archive, or uses a copy you already have.
+
+This notice does not claim ownership of third-party intellectual property or imply permission to use it.
+
+Not affiliated with or endorsed by Nintendo. Nintendo, Nintendo DS and Wii are trademarks of Nintendo.

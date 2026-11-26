@@ -2,6 +2,7 @@
 name = "swfx"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 description = "Converter and developer tools: turns the original Flash data into native assets"
 
 [dependencies]

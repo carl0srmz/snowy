@@ -2,6 +2,7 @@
 name = "snow_fmt"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 description = "Native asset format for the Mission in Snowdriftland port"
 
 [dependencies]
