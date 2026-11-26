@@ -54,8 +54,26 @@ computed in a fragment shader, and masks use the stencil buffer. The blur and co
 in the intro are drawn into offscreen textures and filtered on the GPU. Vector art is drawn at the
 window's resolution, so it stays sharp at any size.
 
-The game logic runs at the original 34 frames per second. The renderer interpolates positions
-between logic frames, so scrolling looks smooth on 60 Hz and faster screens.
+The game logic runs at the original 34 frames per second. Drawing is separate and runs up to
+240 frames per second by default (`--fps` changes the cap). At the start of each logic tick every
+clip's matrix and colour transform are saved, and each drawn frame blends from the saved state to
+the current one, by how far the clock is between the two ticks. That covers scrolling, characters,
+tweens and fades. Some changes are cuts in the original and are not blended:
+
+- a clip created during the tick, which has no earlier state to blend from;
+- a sprite turning round (the sign of its scale flips), which would otherwise squash to zero
+  width for a moment;
+- a move of more than 150 pixels or a rotation of more than 60 degrees in one tick, such as a
+  respawn or a background wrapping round;
+- a colour or alpha change of more than half the range in one tick, such as a blink or a hit flash.
+
+The swapchain uses mailbox presentation where the driver has it, so frames are never held back
+by the display and don't tear. Frame pacing sleeps until shortly before each deadline and
+spins for the rest, because a plain sleep can overshoot a 4 ms frame. Lab trailers pick their next
+video frame on every drawn frame rather than every logic tick.
+
+CPU cost per frame is under a millisecond (about 0.1 ms to walk the display list and 0.5 ms to
+record the draws in a typical scene), so the cap and the GPU set the frame rate.
 
 ## Sound and video
 

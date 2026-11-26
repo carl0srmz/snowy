@@ -21,7 +21,7 @@ impl<'a> Scene<'a> {
             return;
         }
         let m = parent_m.mul(&self.world.local_matrix(id, self.alpha));
-        let cx = parent_cx.concat(&c.cx);
+        let cx = parent_cx.concat(&self.world.local_cx(id, self.alpha));
         if cx.mul[3] <= 0.0 && cx.add[3] <= 0.0 && !mask_geom {
             return;
         }

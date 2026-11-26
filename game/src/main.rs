@@ -253,7 +253,7 @@ fn cmd_level(args: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// `snowdrift ui <assets> <repo> --script "tick:30;move:x,y;click:x,y;key:L;shot:out.png" [--lang de] [--unlock]`
+/// `snowdrift ui <assets> <repo> --script "tick:30;move:x,y;click:x,y;keys:LU;alpha:0.5;shot:out.png" [--lang de] [--unlock N]`
 /// Boots the real UI headlessly and drives it with scripted ticks, mouse and screenshots.
 fn cmd_ui(args: &[String]) -> Result<()> {
     let assets = PathBuf::from(&args[0]);
@@ -283,6 +283,7 @@ fn cmd_ui(args: &[String]) -> Result<()> {
     let mut ui = ui::Ui::new(rd, audio, assets, repo, lang, debug)?;
     let target = gfx::Target::new(&ui.rd.device, 900, 578, wgpu::TextureFormat::Rgba8Unorm);
     let mut input = level::Input { left: false, right: false, up: false, down: false };
+    let mut shot_alpha = 1.0f32;
     for op in script.split(';').filter(|s| !s.trim().is_empty()) {
         let (cmd, arg) = op.trim().split_once(':').unwrap_or((op.trim(), ""));
         match cmd {
@@ -307,9 +308,11 @@ fn cmd_ui(args: &[String]) -> Result<()> {
             }
             "topic" => ui.show_topic(Some(arg), 0),
             "level" => ui.show_topic(Some("game"), arg.parse()?),
+            // draw the following shots this far between the previous and the current tick
+            "alpha" => shot_alpha = arg.parse()?,
             "shot" => {
                 ui.rd.begin_frame();
-                render::Scene { world: &ui.world, alpha: 1.0 }.render(&mut ui.rd, ui.world.root);
+                render::Scene { world: &ui.world, alpha: shot_alpha }.render(&mut ui.rd, ui.world.root);
                 let mut enc = ui.rd.device.create_command_encoder(&Default::default());
                 ui.rd.flush(&mut enc, &target, None, Some(wgpu::Color::WHITE), render::stage_view(900.0, 578.0), [0.0, 0.0, 900.0, 578.0]);
                 ui.rd.queue.submit([enc.finish()]);
@@ -385,7 +388,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         _ => {
-            let mut opt = app::Options { assets: PathBuf::from("assets"), repo: PathBuf::from("original"), level: None, fullscreen: false, mute: false, max_seconds: None, lang: texts::Lang::detect(), debug: false, unlock_all: false };
+            let mut opt = app::Options { assets: PathBuf::from("assets"), repo: PathBuf::from("original"), level: None, fullscreen: false, mute: false, max_seconds: None, lang: texts::Lang::detect(), debug: false, unlock_all: false, vsync: false, max_fps: app::DEFAULT_FPS, show_fps: false };
             let mut i = 0;
             while i < args.len() {
                 match args[i].as_str() {
@@ -398,8 +401,11 @@ fn main() -> Result<()> {
                     "--mute" => opt.mute = true,
                     "--debug" => opt.debug = true,
                     "--unlock-all" => opt.unlock_all = true,
+                    "--vsync" => opt.vsync = true,
+                    "--show-fps" => opt.show_fps = true,
+                    "--fps" => { opt.max_fps = args[i + 1].parse()?; i += 1; }
                     "-h" | "--help" => {
-                        println!("snowdrift [--assets DIR] [--data REPO] [--lang en|de|fr|nl] [--level N] [--fullscreen] [--mute] [--unlock-all] [--debug]\n  mouse: menus and doors; keys: arrows/WASD/space move, Esc back/quit, F11 fullscreen\ndev tools: shot, tree, level, ui, video");
+                        println!("snowdrift [--assets DIR] [--data REPO] [--lang en|de|fr|nl] [--level N] [--fullscreen] [--mute] [--unlock-all] [--debug]\n  [--fps N (default 240, 0 = no cap)] [--vsync] [--show-fps]\n  mouse: menus and doors; keys: arrows/WASD/space move, Esc back/quit, F11 fullscreen\ndev tools: shot, tree, level, ui, video");
                         return Ok(());
                     }
                     _ => {}

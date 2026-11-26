@@ -431,6 +431,13 @@ impl Ui {
         }
     }
 
+    /// Once per drawn frame: shows the next video frame as soon as the audio clock reaches it.
+    pub fn lab_frame(&mut self) {
+        if let Some(v) = self.lab.as_mut().and_then(|l| l.video.as_mut()) {
+            v.update(&mut self.rd, &self.audio);
+        }
+    }
+
     pub fn lab_tick(&mut self) {
         let mut restart = None;
         if let Some(l) = self.lab.as_mut() {

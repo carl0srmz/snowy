@@ -9,7 +9,7 @@ use crate::texts::Lang;
 use crate::ui::{Ui, STAGE_H, STAGE_W, TICK_HZ};
 use anyhow::{anyhow, Result};
 use std::path::PathBuf;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub struct Options {
     pub assets: PathBuf,
@@ -21,6 +21,50 @@ pub struct Options {
     pub lang: Lang,
     pub debug: bool,
     pub unlock_all: bool,
+    /// lock presentation to the display's refresh rate
+    pub vsync: bool,
+    /// frame-rate cap (0 = none)
+    pub max_fps: u32,
+    /// show the frame rate in the window title
+    pub show_fps: bool,
+}
+
+/// Default frame-rate cap.
+pub const DEFAULT_FPS: u32 = 240;
+
+/// Without vsync: Mailbox (no tearing, never waits for the display) where the driver has it,
+/// otherwise Immediate. With vsync, or if neither exists: Fifo, which every driver supports.
+fn pick_present_mode(modes: &[wgpu::PresentMode], vsync: bool) -> wgpu::PresentMode {
+    use wgpu::PresentMode as P;
+    if !vsync {
+        for m in [P::Mailbox, P::Immediate] {
+            if modes.contains(&m) {
+                return m;
+            }
+        }
+    }
+    if modes.contains(&P::FifoRelaxed) && vsync {
+        return P::FifoRelaxed;
+    }
+    P::Fifo
+}
+
+/// Sleeps until `t`: the OS sleep for most of the wait, then a short spin, because a plain sleep
+/// can overshoot by more than the whole frame budget at 240 fps.
+fn sleep_until(t: Instant) {
+    let margin = if cfg!(windows) { Duration::from_micros(1500) } else { Duration::from_micros(400) };
+    loop {
+        let now = Instant::now();
+        if now >= t {
+            return;
+        }
+        let left = t - now;
+        if left > margin {
+            std::thread::sleep(left - margin);
+        } else {
+            std::thread::yield_now();
+        }
+    }
 }
 
 /// Owned, thread-safe copy of the window system's display connection (needed by wgpu 30).
@@ -63,13 +107,16 @@ pub fn run(opt: Options) -> Result<()> {
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))?;
     let caps = surface.get_capabilities(&adapter);
     let format = caps.formats.iter().copied().find(|f| !f.is_srgb()).unwrap_or(caps.formats[0]);
+    let present_mode = pick_present_mode(&caps.present_modes, opt.vsync);
+    let frame_period = (opt.max_fps > 0).then(|| Duration::from_secs_f64(1.0 / opt.max_fps as f64));
+    log::info!("present mode {present_mode:?} (available {:?}), frame cap {}", caps.present_modes, if opt.max_fps > 0 { opt.max_fps.to_string() } else { "none".into() });
     let (pw, ph) = window.drawable_size();
     let mut config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format,
         width: pw.max(1),
         height: ph.max(1),
-        present_mode: wgpu::PresentMode::AutoVsync,
+        present_mode,
         desired_maximum_frame_latency: 2,
         alpha_mode: caps.alpha_modes[0],
         view_formats: vec![],
@@ -114,6 +161,10 @@ pub fn run(opt: Options) -> Result<()> {
     let started = Instant::now();
     let resize_test = std::env::var("SNOWDRIFT_RESIZE_TEST").is_ok();
     let mut frame_no = 0u64;
+    let mut next_frame = Instant::now();
+    let (mut fps_frames, mut fps_since) = (0u32, Instant::now());
+    // time spent waiting for a swapchain image vs. building and submitting the frame
+    let (mut t_wait, mut t_cpu) = (Duration::ZERO, Duration::ZERO);
     'main: loop {
         for e in events.poll_iter() {
             // window -> stage coordinates with the swapchain size as it is right now
@@ -232,6 +283,7 @@ pub fn run(opt: Options) -> Result<()> {
             target = Target::new(&ui.rd.device, config.width, config.height, format);
         }
         let vp = render::fit_viewport(config.width, config.height, STAGE_W, STAGE_H);
+        let t0 = Instant::now();
         let frame = match surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(f) | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
             _ => {
@@ -239,7 +291,10 @@ pub fn run(opt: Options) -> Result<()> {
                 continue;
             }
         };
+        let t1 = Instant::now();
         let view = frame.texture.create_view(&Default::default());
+        // video frames follow the audio clock, not the logic ticks
+        ui.lab_frame();
         let alpha = (acc / tick) as f32;
         ui.rd.begin_frame();
         Scene { world: &ui.world, alpha }.render(&mut ui.rd, ui.world.root);
@@ -247,6 +302,31 @@ pub fn run(opt: Options) -> Result<()> {
         ui.rd.flush(&mut enc, &target, Some(&view), Some(wgpu::Color::WHITE), render::stage_view(STAGE_W, STAGE_H), vp);
         ui.rd.queue.submit([enc.finish()]);
         ui.rd.queue.present(frame);
+        t_wait += t1 - t0;
+        t_cpu += t1.elapsed();
+
+        if opt.show_fps {
+            fps_frames += 1;
+            let el = fps_since.elapsed();
+            if el >= Duration::from_millis(500) {
+                let fps = fps_frames as f64 / el.as_secs_f64();
+                window.set_title(&format!("Mission in Snowdriftland ({fps:.0} fps)")).ok();
+                log::info!("{fps:.1} fps, per frame: {:.2} ms drawing, {:.2} ms waiting for the swapchain", t_cpu.as_secs_f64() * 1e3 / fps_frames as f64, t_wait.as_secs_f64() * 1e3 / fps_frames as f64);
+                (t_wait, t_cpu) = (Duration::ZERO, Duration::ZERO);
+                fps_frames = 0;
+                fps_since = Instant::now();
+            }
+        }
+        if let Some(period) = frame_period {
+            next_frame += period;
+            let now = Instant::now();
+            if next_frame > now {
+                sleep_until(next_frame);
+            } else if now - next_frame > period {
+                // fell behind by more than a frame: start counting from here
+                next_frame = now;
+            }
+        }
     }
     Ok(())
 }

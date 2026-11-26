@@ -82,8 +82,18 @@ Command-line options:
 | `--fullscreen` | Start in fullscreen. |
 | `--mute` | No sound. |
 | `--unlock-all` | Mark every door as played. This writes to your save file. |
+| `--fps N` | Frame-rate cap. The default is 240; `0` removes the cap. |
+| `--vsync` | Wait for the display instead of drawing as fast as the cap allows. Use it if you see tearing or want to save power. |
+| `--show-fps` | Show the frame rate in the window title. |
 | `--debug` | Show the original's hidden test button on the world map. |
 | `--seconds N` | Quit after N seconds. Useful for scripted tests. |
+
+The game logic runs at the original 34 ticks per second, as it did in Flash. The picture is drawn
+separately, up to 240 times per second by default, with positions, scrolling and fades blended
+between ticks, so motion stays smooth on high refresh rate screens. The frame rate isn't tied to the
+display: the game uses the driver's mailbox mode, which never waits for the screen and doesn't tear.
+If the driver has no mailbox mode, it draws without waiting, which can tear; `--vsync` turns that
+off.
 
 ### Saves and files
 
@@ -106,6 +116,9 @@ These are intentional:
   shipped with the game. It's the only text in the game that used a system font.
 - Vector graphics are drawn at your screen's resolution instead of the original 900 x 578, so they
   stay sharp in fullscreen.
+- Flash showed a new picture 34 times per second. The port draws up to 240 and blends movement
+  between the original frames. The game itself still runs at 34 ticks per second, so timing and
+  physics are unchanged.
 - Links open in your web browser, and downloads are saved to disk instead of opening a browser tab.
 
 Known issues:

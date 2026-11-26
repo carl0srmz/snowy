@@ -87,6 +87,11 @@ pub struct Clip {
     pub m: Matrix,
     pub prev_m: Matrix,
     pub cx: CXform,
+    /// colour transform at the start of the current logic tick (for interpolation)
+    pub prev_cx: CXform,
+    /// false until the first `latch` after creation: a clip born this tick has no previous
+    /// state, so it is drawn where it is instead of sliding in from the origin
+    pub latched: bool,
     pub visible: bool,
     pub blend: Blend,
     pub filters: Vec<Filter>,
@@ -152,6 +157,27 @@ pub struct World {
     /// clips whose script cleared `onEnterFrame` (cancels pending delayed actions)
     pub cancelled_enter: Vec<ClipId>,
 }
+
+/// True when a transform changed in a way that is a cut rather than motion: a sprite turning
+/// round (`_xscale = -100`), a large rotation, or a jump such as a respawn or a wrapping
+/// background. Blending those would squash or smear the sprite for a tick.
+fn is_jump(a: &Matrix, b: &Matrix) -> bool {
+    let (da, db) = (a.a * a.d - a.b * a.c, b.a * b.d - b.b * b.c);
+    if da * db < 0.0 {
+        return true;
+    }
+    let (dx, dy) = (b.tx - a.tx, b.ty - a.ty);
+    if dx * dx + dy * dy > JUMP_DIST * JUMP_DIST {
+        return true;
+    }
+    // angle between the x axes
+    let cross = a.a * b.b - a.b * b.a;
+    let dot = a.a * b.a + a.b * b.b;
+    (dot != 0.0 || cross != 0.0) && cross.atan2(dot).abs() > std::f32::consts::FRAC_PI_3
+}
+
+/// Movement per tick above which a position change is treated as a jump (stage pixels at 1x).
+const JUMP_DIST: f32 = 150.0;
 
 fn lerp_m(a: &Matrix, b: &Matrix, t: f32) -> Matrix {
     let f = |x: f32, y: f32| x + (y - x) * t;
@@ -866,6 +892,7 @@ impl World {
                     } else {
                         c.cx = CXform::IDENTITY;
                     }
+                    c.prev_cx = c.cx;
                     if let Some(r) = p.ratio {
                         c.ratio = r;
                     }
@@ -1106,18 +1133,40 @@ impl World {
     pub fn latch(&mut self) {
         for c in self.clips.iter_mut().flatten() {
             c.prev_m = c.m;
+            c.prev_cx = c.cx;
+            c.latched = true;
         }
     }
 
     // ---- geometry ---------------------------------------------------------
 
+    /// The clip's matrix `alpha` of the way from the previous logic tick to the current one.
     pub fn local_matrix(&self, id: ClipId, alpha: f32) -> Matrix {
         let c = self.clip(id).unwrap();
-        if alpha >= 1.0 {
+        if alpha >= 1.0 || !c.latched || c.prev_m == c.m || is_jump(&c.prev_m, &c.m) {
             c.m
         } else {
             lerp_m(&c.prev_m, &c.m, alpha)
         }
+    }
+
+    /// The clip's colour transform, interpolated like `local_matrix`.
+    pub fn local_cx(&self, id: ClipId, alpha: f32) -> CXform {
+        let c = self.clip(id).unwrap();
+        if alpha >= 1.0 || !c.latched || c.prev_cx == c.cx {
+            return c.cx;
+        }
+        let (a, b) = (&c.prev_cx, &c.cx);
+        let mut r = *b;
+        for i in 0..4 {
+            // a blink or a hit flash changes a lot in one tick: keep it a step
+            if (b.mul[i] - a.mul[i]).abs() > 0.5 || (b.add[i] - a.add[i]).abs() > 0.5 {
+                return c.cx;
+            }
+            r.mul[i] = a.mul[i] + (b.mul[i] - a.mul[i]) * alpha;
+            r.add[i] = a.add[i] + (b.add[i] - a.add[i]) * alpha;
+        }
+        r
     }
 
     /// Matrix from `id`'s space to stage space (no interpolation).
@@ -1203,6 +1252,8 @@ impl Clip {
             m: Matrix::IDENTITY,
             prev_m: Matrix::IDENTITY,
             cx: CXform::IDENTITY,
+            prev_cx: CXform::IDENTITY,
+            latched: false,
             visible: true,
             blend: Blend::Normal,
             filters: Vec::new(),
@@ -1382,5 +1433,70 @@ impl World {
             return Some(tex);
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn at(x: f32, y: f32) -> Matrix {
+        Matrix { a: 1.0, b: 0.0, c: 0.0, d: 1.0, tx: x, ty: y }
+    }
+
+    /// A clip with a previous and a current state, as after one logic tick.
+    fn moved(w: &mut World, from: Matrix, to: Matrix, cx0: CXform, cx1: CXform) -> ClipId {
+        let id = w.create_empty(w.root, "c", 1);
+        let c = w.clip_mut(id).unwrap();
+        c.m = from;
+        c.cx = cx0;
+        w.latch();
+        let c = w.clip_mut(id).unwrap();
+        c.m = to;
+        c.cx = cx1;
+        id
+    }
+
+    #[test]
+    fn motion_is_blended() {
+        let mut w = World::new();
+        let id = moved(&mut w, at(10.0, 0.0), at(20.0, 4.0), CXform::IDENTITY, CXform::IDENTITY);
+        let m = w.local_matrix(id, 0.25);
+        assert!((m.tx - 12.5).abs() < 1e-4 && (m.ty - 1.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn new_clips_are_not_blended_from_the_origin() {
+        let mut w = World::new();
+        let id = w.create_empty(w.root, "c", 1);
+        w.clip_mut(id).unwrap().m = at(300.0, 200.0);
+        assert_eq!(w.local_matrix(id, 0.5).tx, 300.0);
+    }
+
+    #[test]
+    fn cuts_are_not_blended() {
+        let mut w = World::new();
+        // turning round
+        let flip = Matrix { a: -1.0, ..at(5.0, 0.0) };
+        let id = moved(&mut w, at(0.0, 0.0), flip, CXform::IDENTITY, CXform::IDENTITY);
+        assert_eq!(w.local_matrix(id, 0.5).a, -1.0);
+        // respawn / wrap-around
+        let id = moved(&mut w, at(0.0, 0.0), at(480.0, 0.0), CXform::IDENTITY, CXform::IDENTITY);
+        assert_eq!(w.local_matrix(id, 0.5).tx, 480.0);
+        // half turn
+        let rot = Matrix { a: -1.0, b: 0.0, c: 0.0, d: -1.0, tx: 0.0, ty: 0.0 };
+        let id = moved(&mut w, at(0.0, 0.0), rot, CXform::IDENTITY, CXform::IDENTITY);
+        assert_eq!(w.local_matrix(id, 0.5).a, -1.0);
+    }
+
+    #[test]
+    fn fades_are_blended_but_flashes_are_not() {
+        let mut w = World::new();
+        let half = CXform { mul: [1.0, 1.0, 1.0, 0.6], add: [0.0; 4] };
+        let id = moved(&mut w, at(0.0, 0.0), at(0.0, 0.0), CXform::IDENTITY, half);
+        assert!((w.local_cx(id, 0.5).mul[3] - 0.8).abs() < 1e-4);
+        let white = CXform { mul: [1.0; 4], add: [1.0, 1.0, 1.0, 0.0] };
+        let id = moved(&mut w, at(0.0, 0.0), at(0.0, 0.0), CXform::IDENTITY, white);
+        assert_eq!(w.local_cx(id, 0.5).add[0], 1.0);
     }
 }
